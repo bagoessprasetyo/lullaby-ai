@@ -37,17 +37,7 @@ export const HeroHighlight = ({
       )}
       onMouseMove={handleMouseMove}
     >
-        <div className="flex flex-col w-full items-center justify-center gap-4 z-20 mb-5">
-
-            <Announcement themed className="bg-sky-100 text-sky-700">
-            <AnnouncementTag className="bg-white">Info</AnnouncementTag>
-            <AnnouncementTitle>
-                Welcome to the lullaby.ai
-                <ArrowUpRightIcon size={16} className="shrink-0 opacity-70" />
-            </AnnouncementTitle>
-            </Announcement>
-
-        </div>
+      
       <div className="absolute inset-0 bg-dot-thick-neutral-300 dark:bg-dot-thick-neutral-800  pointer-events-none" />
       <motion.div
         className="pointer-events-none bg-dot-thick-indigo-500 dark:bg-dot-thick-indigo-500   absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100"
@@ -68,7 +58,14 @@ export const HeroHighlight = ({
           `,
         }}
       />
-      <div className={cn("relative z-20  flex flex-row items-center ", className)}>
+      <div className={cn("relative z-20  flex flex-col lg:flex-row space-y-5 lg:space-y-0 items-center mt-28 lg:mt-5", className)}>
+        <Announcement themed className="bg-sky-100 text-sky-700 mt-5 lg:hidden">
+          <AnnouncementTag className="bg-white">Info</AnnouncementTag>
+          <AnnouncementTitle>
+              Welcome to the lullaby.ai
+              <ArrowUpRightIcon size={16} className="shrink-0 opacity-70" />
+          </AnnouncementTitle>
+        </Announcement>
         {children}
         <AudioPlayer
             src="/story.wav"

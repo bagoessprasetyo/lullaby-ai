@@ -75,7 +75,6 @@ export default function Home() {
   return (
     // <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-2 row-start-2 items-center sm:items-start">
-
         <HeroHighlight>
           <motion.h1
             initial={{
@@ -90,7 +89,7 @@ export default function Home() {
               duration: 0.5,
               ease: [0.4, 0.0, 0.2, 1],
             }}
-            className="text-2xl px-4 md:text-4xl lg:text-5xl font-bold text-neutral-700 dark:text-white max-w-4xl leading-relaxed lg:leading-snug text-left mx-auto "
+            className="text-2xl px-4 md:text-4xl lg:text-5xl font-bold text-neutral-700 dark:text-white max-w-4xl leading-relaxed lg:leading-snug text-center lg:text-left mx-auto mt-28 lg:mt-4"
           >
             Transform cherished moments into magical bedtime stories powered by {" "} 
             <Highlight className="text-black dark:text-white">
@@ -102,7 +101,7 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeIn" }}
-          className="mx-auto flex flex-col space-y-3 bg-black"
+          className="mx-auto flex flex-col space-y-3 bg-black mt-52 lg:mt-4"
         >
           <MagnetizeButton particleCount={14}attractRadius={50} className="w-1/6 ml-4 mx-auto" />
           <BentoGrid items={itemsSample} />
