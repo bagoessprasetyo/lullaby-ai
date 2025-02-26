@@ -1,6 +1,8 @@
 "use client";
 
+import { UpgradeModalProvider } from "@/components/upgrade-modal-providers";
 import { SessionProvider } from "next-auth/react";
+
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -9,7 +11,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       refetchInterval={0}
       refetchOnWindowFocus={false}
     >
-      {children}
+      <UpgradeModalProvider>
+        {children}
+      </UpgradeModalProvider>
     </SessionProvider>
   );
 }

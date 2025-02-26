@@ -11,9 +11,9 @@ import {
     ScanFace,
     Sparkles,
     Mail, Phone, Linkedin,
-    ArrowUpRightIcon
 } from "lucide-react";
 import { MagnetizeButton } from "@/components/ui/magnetize-button";
+import { PricingSection } from "@/components/pricing/pricing-section";
 
 export default function Home() {
 
@@ -105,6 +105,14 @@ export default function Home() {
         >
           <MagnetizeButton particleCount={14}attractRadius={50} className="w-1/6 ml-4 mx-auto" />
           <BentoGrid items={itemsSample} />
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeIn" }}
+          className="mx-auto flex flex-col space-y-3 bg-black mt-52 lg:mt-4"
+        >
+          <PricingSection />
         </motion.div>
         <motion.footer
           initial={{ opacity: 0, y: 20 }}

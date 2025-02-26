@@ -20,6 +20,7 @@ import { StoryFormData } from "@/app/dashboard/create/page";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useUpgradeModal } from "@/hooks/useUpgradeModal";
 
 interface VoiceSelectionStepProps {
   formData: StoryFormData;
@@ -64,7 +65,7 @@ export function VoiceSelectionStep({
 }: VoiceSelectionStepProps) {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [selectedVoice, setSelectedVoice] = useState(formData.voice || 'ai-1');
-  
+  const { openModal } = useUpgradeModal();
   const togglePlayVoice = (id: string) => {
     if (currentlyPlaying === id) {
       setCurrentlyPlaying(null);
@@ -170,6 +171,7 @@ export function VoiceSelectionStep({
                 Upgrade to Premium to use your own voice for story narration
               </p>
               <Button 
+                onClick={() => openModal("Custom Voice Profiles")}
                 variant="outline" 
                 className="bg-amber-900/30 text-amber-300 border-amber-800 hover:bg-amber-900/50"
               >

@@ -299,7 +299,7 @@ export default function StoryCreationPage() {
               {currentStep < steps.length - 1 ? (
                 <Button 
                   onClick={handleNext}
-                  className="bg-indigo-600 hover:bg-indigo-700"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
                 >
                   Next
                   <ArrowRight className="ml-2 h-4 w-4" />

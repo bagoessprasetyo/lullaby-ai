@@ -13,6 +13,7 @@ import {
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { useUpgradeModal } from "@/hooks/useUpgradeModal";
 
 interface DurationStepProps {
   formData: StoryFormData;
@@ -30,6 +31,8 @@ export function DurationStep({
   const handleDurationChange = (value: "short" | "medium" | "long") => {
     updateFormData("duration", value);
   };
+
+  const { openModal } = useUpgradeModal();
   
   return (
     <div className="space-y-6">
@@ -149,7 +152,7 @@ export function DurationStep({
           <AlertCircle className="h-4 w-4 text-amber-400" />
           <AlertDescription className="text-amber-300">
             Long stories (5+ minutes) are available for subscribers only. 
-            <Button variant="link" className="text-amber-400 h-auto p-0 ml-1">
+            <Button onClick={() => openModal("Story Duration")} variant="link" className="text-amber-400 h-auto p-0 ml-1">
               Upgrade to Premium
             </Button>
           </AlertDescription>

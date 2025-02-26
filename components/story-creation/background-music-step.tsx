@@ -20,6 +20,9 @@ import { StoryFormData } from "@/app/dashboard/create/page";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { PremiumFeatureAlert } from "@/components/premium-feature-alert";
+import { useUpgradeModal } from "@/hooks/useUpgradeModal";
+
 
 interface BackgroundMusicStepProps {
   formData: StoryFormData;
@@ -43,10 +46,14 @@ export function BackgroundMusicStep({
   isSubscriber 
 }: BackgroundMusicStepProps) {
   const [playing, setPlaying] = useState<string | null>(null);
+  const { openModal } = useUpgradeModal();
   
   const handleMusicChange = (value: string) => {
     if (isSubscriber) {
       updateFormData("backgroundMusic", value);
+    } else {
+      // If not a subscriber, open the upgrade modal
+      openModal("Background Music");
     }
   };
   
@@ -57,6 +64,9 @@ export function BackgroundMusicStep({
       } else {
         setPlaying(id);
       }
+    } else {
+      // If not a subscriber, open the upgrade modal
+      openModal("Background Music");
     }
   };
   
@@ -119,21 +129,12 @@ export function BackgroundMusicStep({
       </div>
       
       {!isSubscriber ? (
-        // Subscriber-only message
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 text-center">
-          <div className="bg-amber-900/20 rounded-full p-3 inline-flex mb-4">
-            <MusicIcon className="h-7 w-7 text-amber-400" />
-          </div>
-          <h4 className="text-lg font-medium text-white mb-2">
-            Background Music is a Premium Feature
-          </h4>
-          <p className="text-gray-400 mb-4">
-            Enhance your stories with calming background music to create the perfect bedtime atmosphere.
-          </p>
-          <Button className="bg-amber-600 hover:bg-amber-700">
-            Upgrade to Premium
-          </Button>
-        </div>
+        // Subscriber-only message using our enhanced component
+        <PremiumFeatureAlert 
+          variant="banner"
+          featureName="Background Music"
+          message="Enhance your stories with calming background music to create the perfect bedtime atmosphere."
+        />
       ) : (
         // Music selection for subscribers
         <RadioGroup 
