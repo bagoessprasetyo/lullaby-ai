@@ -36,6 +36,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatDuration } from "@/lib/format-duration";
+import { Metadata } from "next";
+import React from "react";
 
 // Mocked story data - in a real app, this would come from an API
 const mockStory = {
@@ -90,13 +92,15 @@ const mockStory = {
   `
 };
 
-interface StoryDetailPageProps {
-  params: { storyId: string };
-}
+type StoryDetailPageProps = {
+    params: {
+      storyId: string;
+    };
+};
 
 export default function StoryDetailPage({ params }: StoryDetailPageProps) {
   // In a real app, we would fetch the story data using the storyId
-  const storyId = params.storyId;
+  const storyId = Promise.resolve(params.storyId);
   const router = useRouter();
   
   const [isPlaying, setIsPlaying] = useState(false);
