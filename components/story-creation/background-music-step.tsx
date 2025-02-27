@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  AlertCircle,
   MusicIcon,
   Pause,
   Play,
@@ -42,7 +41,6 @@ type MusicOption = {
 export function BackgroundMusicStep({ 
   formData, 
   updateFormData, 
-  errors,
   isSubscriber 
 }: BackgroundMusicStepProps) {
   const [playing, setPlaying] = useState<string | null>(null);

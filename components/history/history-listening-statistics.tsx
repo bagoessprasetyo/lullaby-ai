@@ -11,13 +11,11 @@ import {
 } from "@/components/ui/tabs";
 import {
   BarChart,
-  PieChart,
   Clock,
   Calendar,
   Star,
   Play,
   TrendingUp,
-  BarChart2,
   PieChart as PieChartIcon,
   MoveVertical
 } from "lucide-react";

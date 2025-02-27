@@ -103,7 +103,7 @@ export function DashboardNavbar() {
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="grid gap-2 py-6">
-                  {navItems.map((item, index) => (
+                  {navItems.map((item) => (
                     <Link
                       key={item.name}
                       href={item.href}

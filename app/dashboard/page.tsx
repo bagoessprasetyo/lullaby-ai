@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, PlusCircle, Clock, Book } from "lucide-react";
+import { PlusCircle, Clock, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
 

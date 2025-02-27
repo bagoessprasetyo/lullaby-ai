@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, X, Sparkles, CreditCard } from "lucide-react";
+import { Check, Sparkles, CreditCard } from "lucide-react";
 import { 
   Dialog, 
   DialogContent,

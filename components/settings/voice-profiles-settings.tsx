@@ -1,21 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Mic, 
-  User,
   Play, 
-  Pause, 
-  VolumeX, 
+  Pause,
   Check, 
   Plus, 
   Trash2, 
@@ -61,7 +58,7 @@ export function VoiceProfilesSettings({ isSubscriber = true, subscriptionTier = 
   const [newVoiceName, setNewVoiceName] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStep, setRecordingStep] = useState(1);
-  const [sampleText, setSampleText] = useState("The quick brown fox jumps over the lazy dog. Hello, this is my voice for bedtime stories.");
+  const [sampleText] = useState("The quick brown fox jumps over the lazy dog. Hello, this is my voice for bedtime stories.");
   
   // Maximum allowed voice profiles based on subscription tier
   const getMaxVoiceProfiles = () => {

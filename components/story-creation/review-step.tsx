@@ -8,7 +8,6 @@ import {
   MusicIcon,
   Globe,
   Sparkles,
-  Check,
   PencilIcon,
   Lock
 } from "lucide-react";
@@ -27,7 +26,6 @@ interface ReviewStepProps {
 
 export function ReviewStep({ 
   formData, 
-  updateFormData,
   isSubscriber,
   onGenerateStory
 }: ReviewStepProps) {

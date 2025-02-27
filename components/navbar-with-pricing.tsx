@@ -37,7 +37,7 @@ import {
   CreditCard,
   Sparkles,
 } from "lucide-react";
-import { signOut, signIn } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -133,7 +133,7 @@ export function Navbar() {
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="grid gap-2 py-6">
-                  {navItems.map((item, index) => (
+                  {navItems.map((item) => (
                     <Link
                       key={item.name}
                       href={item.href}

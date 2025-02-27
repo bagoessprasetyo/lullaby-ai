@@ -4,11 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { motion } from "framer-motion";
 import { 
   ImagePlus, 
   Users, 
@@ -31,11 +28,6 @@ import { BackgroundMusicStep } from "@/components/story-creation/background-musi
 import { LanguageStep } from "@/components/story-creation/language-step";
 import { VoiceSelectionStep } from "@/components/story-creation/voice-selection-step";
 import { ReviewStep } from "@/components/story-creation/review-step";
-import { 
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
 
 // Types for our form data
 export type StoryFormData = {

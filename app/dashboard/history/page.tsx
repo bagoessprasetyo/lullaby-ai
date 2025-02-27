@@ -17,14 +17,12 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { motion } from "framer-motion";
 import {
   Calendar,
   Clock,
   Play,
   Calendar as CalendarIcon,
   BarChart,
-  ListFilter,
   Search,
   TrendingUp,
   RotateCcw,
@@ -34,11 +32,6 @@ import {
   ThumbsUp,
   Star,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { CalendarHeatmap } from "@/components/history/calendar-heatmap";
-import { ActivityTimeline } from "@/components/history/activity-timeline";
-import { StoryStatistics } from "@/components/history/history-listening-statistics";
-import { ListeningStreak } from "@/components/history/listening-streak";
 import { formatDuration } from "@/lib/format-duration";
 
 // Types for history data

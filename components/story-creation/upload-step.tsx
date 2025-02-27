@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -11,7 +10,7 @@ import {
   Plus, 
   AlertCircle 
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { 
   AlertCircle, 
@@ -13,8 +13,7 @@ import {
   Pause, 
   Sparkles, 
   User, 
-  Volume2,
-  VolumeX
+  Volume2
 } from "lucide-react";
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { Alert, AlertDescription } from "@/components/ui/alert";

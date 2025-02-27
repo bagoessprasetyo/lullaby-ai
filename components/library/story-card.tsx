@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,12 +30,6 @@ import {
 import { Story } from "@/app/dashboard/library/page";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/format-duration";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface StoryCardProps {
   story: Story;
