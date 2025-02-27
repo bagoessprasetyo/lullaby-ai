@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UploadStep } from "@/components/story-creation/upload-step";
+import { ThemeSelectionStep } from "@/components/story-creation/theme-selection-step";
 import { CharactersStep } from "@/components/story-creation/characters-step";
 import { DurationStep } from "@/components/story-creation/duration-step";
 import { BackgroundMusicStep } from "@/components/story-creation/background-music-step";
@@ -40,6 +41,7 @@ import {
 export type StoryFormData = {
   images: File[];
   characters: { name: string; description: string }[];
+  theme: string; // New field for theme selection
   duration: "short" | "medium" | "long";
   backgroundMusic: string;
   language: string;
@@ -51,6 +53,7 @@ export type StoryFormData = {
 const initialFormData: StoryFormData = {
   images: [],
   characters: [{ name: "", description: "" }],
+  theme: "adventure", // Default theme
   duration: "short",
   backgroundMusic: "calming",
   language: "english",
@@ -61,6 +64,7 @@ const initialFormData: StoryFormData = {
 // Define steps
 const steps = [
   { id: "upload", label: "Upload Photos", icon: <ImagePlus className="h-4 w-4" /> },
+  { id: "theme", label: "Theme", icon: <Sparkles className="h-4 w-4" /> }, // New step
   { id: "characters", label: "Characters", icon: <Users className="h-4 w-4" /> },
   { id: "duration", label: "Duration", icon: <Timer className="h-4 w-4" /> },
   { id: "music", label: "Background Music", icon: <Music className="h-4 w-4" />, 
@@ -99,7 +103,13 @@ export default function StoryCreationPage() {
         }
         break;
         
-      case 1: // Characters
+      case 1: // Theme Selection (new step)
+        if (!formData.theme) {
+          newErrors.theme = "Please select a theme for your story";
+        }
+        break;
+        
+      case 2: // Characters (previously step 1)
         const emptyCharacters = formData.characters.filter(
           (character) => character.name.trim() === ""
         );
@@ -108,16 +118,24 @@ export default function StoryCreationPage() {
         }
         break;
         
-      case 3: // Background Music (for subscribers only)
+      case 3: // Duration (previously step 2)
+        if (formData.duration === "long" && !isSubscriber) {
+          newErrors.duration = "Long stories are available for subscribers only";
+        }
+        break;
+        
+      case 4: // Background Music (previously step 3)
         if (!isSubscriber) {
           // No validation needed, we'll show a message in the UI
         }
         break;
         
-      case 4: // Duration
-        if (formData.duration === "long" && !isSubscriber) {
-          newErrors.duration = "Long stories are available for subscribers only";
-        }
+      case 5: // Language
+        // Add any language validation if needed
+        break;
+        
+      case 6: // Voice
+        // Add any voice validation if needed
         break;
     }
     
@@ -232,6 +250,15 @@ export default function StoryCreationPage() {
               )}
               
               {currentStep === 1 && (
+                <ThemeSelectionStep 
+                  formData={formData}
+                  updateFormData={updateFormData}
+                  errors={errors}
+                  isSubscriber={isSubscriber}
+                />
+              )}
+              
+              {currentStep === 2 && (
                 <CharactersStep 
                   formData={formData}
                   updateFormData={updateFormData}
@@ -239,7 +266,7 @@ export default function StoryCreationPage() {
                 />
               )}
               
-              {currentStep === 2 && (
+              {currentStep === 3 && (
                 <DurationStep 
                   formData={formData}
                   updateFormData={updateFormData}
@@ -248,7 +275,7 @@ export default function StoryCreationPage() {
                 />
               )}
               
-              {currentStep === 3 && (
+              {currentStep === 4 && (
                 <BackgroundMusicStep 
                   formData={formData}
                   updateFormData={updateFormData}
@@ -257,7 +284,7 @@ export default function StoryCreationPage() {
                 />
               )}
               
-              {currentStep === 4 && (
+              {currentStep === 5 && (
                 <LanguageStep 
                   formData={formData}
                   updateFormData={updateFormData}
@@ -265,7 +292,7 @@ export default function StoryCreationPage() {
                 />
               )}
               
-              {currentStep === 5 && (
+              {currentStep === 6 && (
                 <VoiceSelectionStep 
                   formData={formData}
                   updateFormData={updateFormData}
@@ -274,7 +301,7 @@ export default function StoryCreationPage() {
                 />
               )}
               
-              {currentStep === 6 && (
+              {currentStep === 7 && (
                 <ReviewStep 
                   formData={formData}
                   updateFormData={updateFormData}
