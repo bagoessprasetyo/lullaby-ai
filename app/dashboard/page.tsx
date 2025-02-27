@@ -1,29 +1,50 @@
+// app/dashboard/page.tsx
 "use client";
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { PlusCircle, Clock, Book } from "lucide-react";
+import { Sparkles, PlusCircle, Clock, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
+import { getRecentStories, getStoryCount, Story } from "@/lib/services/story-service";
+import { formatDuration } from "@/lib/format-duration";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
+  console.log(session);
   const router = useRouter();
-  const [stories, setStories] = useState([]);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [storyCount, setStoryCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading user's stories
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      // Mock data - in real app, fetch from API
-      setStories([]);
-    }, 1000);
+    console.log("Auth Status:", status);
+    console.log("Session:", session);
+    console.log("User ID:", session?.user?.id);
+    const fetchData = async () => {
+      if (session?.user?.id) {
+        setIsLoading(true);
+        try {
+          // Fetch stories from Supabase
+          const recentStories = await getRecentStories(session.user.id);
+          const count = await getStoryCount(session.user.id);
+          
+          setStories(recentStories);
+          setStoryCount(count);
+        } catch (error) {
+          console.error("Error fetching dashboard data:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
     
-    return () => clearTimeout(timer);
-  }, []);
+    if (status === "authenticated") {
+      fetchData();
+    }
+  }, [session, status]);
 
   if (status === "loading") {
     return (
@@ -65,7 +86,39 @@ export default function DashboardPage() {
             </div>
           ) : stories.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Story cards would go here */}
+              {stories.map((story) => (
+                <div 
+                  key={story.id}
+                  className="bg-gray-900 rounded-xl p-6 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all"
+                  onClick={() => router.push(`/dashboard/stories/${story.id}`)}
+                >
+                  <h3 className="text-xl font-semibold text-white mb-2">
+                    {story.title}
+                  </h3>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
+                      {story.language === 'en' ? 'English' : 
+                       story.language === 'fr' ? 'French' : 
+                       story.language === 'ja' ? 'Japanese' : 
+                       story.language === 'id' ? 'Indonesian' : story.language}
+                    </span>
+                    <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
+                      {formatDuration(story.duration || 0)}
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-sm mb-4">
+                    Created on {new Date(story.created_at).toLocaleDateString()}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-gray-700 hover:bg-gray-800"
+                  >
+                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                    Listen Now
+                  </Button>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="text-center py-20 bg-gray-900/50 rounded-xl border border-gray-800">
@@ -94,9 +147,26 @@ export default function DashboardPage() {
               Recent Activity
             </h2>
             <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-              <p className="text-gray-400 text-center py-8">
-                Your story creation activity will appear here.
-              </p>
+              {isLoading ? (
+                <div className="h-32 animate-pulse bg-gray-800 rounded-lg"></div>
+              ) : storyCount > 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-gray-300">
+                    You have created {storyCount} {storyCount === 1 ? 'story' : 'stories'} so far!
+                  </p>
+                  {stories.length > 0 && (
+                    <p className="text-gray-400 mt-2">
+                      Your most recent story: <span className="text-indigo-400">{stories[0].title}</span> 
+                      <span className="text-gray-500"> • </span>
+                      <span className="text-gray-400">{new Date(stories[0].created_at).toLocaleDateString()}</span>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-400 text-center py-8">
+                  Your story creation activity will appear here.
+                </p>
+              )}
             </div>
           </div>
         </motion.div>

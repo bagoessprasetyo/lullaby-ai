@@ -24,11 +24,14 @@ export function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
-      await signIn("google", { callbackUrl: "/dashboard", redirect:true });
+      console.log("Starting Google sign in");
+      await signIn("google", { 
+        callbackUrl: "/dashboard",
+        redirect: true 
+      });
+      console.log("Sign in function completed"); // This may not log if redirect is successful
     } catch (error) {
       console.error("Error signing in:", error);
-    } finally {
-      // Note: This may not run if redirected successfully
       setIsLoading(false);
     }
   };

@@ -96,11 +96,13 @@ type StoryDetailPageProps = {
     params: {
       storyId: string;
     };
+    searchParams: { [key: string]: string | string[] | undefined };
 };
 
 export default function StoryDetailPage({ params }: StoryDetailPageProps) {
   // In a real app, we would fetch the story data using the storyId
-  const storyId = Promise.resolve(params.storyId);
+//   const storyId = Promise.resolve(params.storyId);
+  const storyId = params.storyId;
   const router = useRouter();
   
   const [isPlaying, setIsPlaying] = useState(false);

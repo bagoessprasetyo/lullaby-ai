@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { SubscriptionPlan, SubscriptionState, BillingPeriod } from '@/types/subscription';
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Sparkles, CreditCard } from "lucide-react";
 import { 
@@ -22,6 +23,39 @@ interface UpgradeModalProps {
   highlightedFeature?: string;
 }
 
+const defaultPlans: SubscriptionPlan[] = [
+  {
+    id: "premium",
+    name: "Premium",
+    description: "Perfect for individual use",
+    price: 9.99,
+    period: 'monthly',
+    features: [
+      "Unlimited AI-generated stories",
+      "All story lengths (including long)",
+      "Background music library",
+      "3 custom voice profiles",
+      "Premium AI voices",
+      "Ad-free experience"
+    ]
+  },
+  {
+    id: "family",
+    name: "Family",
+    description: "Best for families with multiple children",
+    price: 14.99,
+    period: 'annual',
+    features: [
+      "Everything in Premium",
+      "Up to 10 custom voice profiles",
+      "Family sharing (up to 5 members)",
+      "Educational story templates",
+      "Story series & collections",
+      "Premium support"
+    ]
+  }
+];
+
 export function UpgradeModal({ 
   isOpen, 
   onOpenChange,
@@ -30,40 +64,18 @@ export function UpgradeModal({
   const [isAnnual, setIsAnnual] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<"premium" | "family">("premium");
   const [isProcessing, setIsProcessing] = useState(false);
-
+  const [state, setState] = useState<SubscriptionState>({
+    isProcessing: false,
+    selectedPlan: 'premium',
+    billingPeriod: 'annual'
+  });
   // Plans data
-  const plans = [
-    {
-      id: "premium",
-      name: "Premium",
-      description: "Perfect for individual use",
-      price: isAnnual ? 7.99 : 9.99,
-      period: isAnnual ? "month, billed annually" : "month",
-      features: [
-        "Unlimited AI-generated stories",
-        "All story lengths (including long)",
-        "Background music library",
-        "3 custom voice profiles",
-        "Premium AI voices",
-        "Ad-free experience"
-      ]
-    },
-    {
-      id: "family",
-      name: "Family",
-      description: "Best for families with multiple children",
-      price: isAnnual ? 12.99 : 14.99,
-      period: isAnnual ? "month, billed annually" : "month",
-      features: [
-        "Everything in Premium",
-        "Up to 10 custom voice profiles",
-        "Family sharing (up to 5 members)",
-        "Educational story templates",
-        "Story series & collections",
-        "Premium support"
-      ]
-    }
-  ];
+  const plans = useMemo(() => {
+    return defaultPlans.map(plan => ({
+      ...plan,
+      price: state.billingPeriod === 'annual' ? plan.price * 0.8 : plan.price
+    }));
+  }, [state.billingPeriod]);
 
   const handleUpgrade = async () => {
     setIsProcessing(true);

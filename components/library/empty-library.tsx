@@ -31,10 +31,10 @@ export function EmptyLibrary() {
         
         <Button
           onClick={() => router.push("/dashboard/create")}
-          className="bg-indigo-600 hover:bg-indigo-700 px-6"
+          className="bg-indigo-600 hover:bg-indigo-700 px-6 text-white"
           size="lg"
         >
-          <Plus className="mr-2 h-4 w-4" />
+          <Plus className="mr-2 h-4 w-4 text-white" />
           Create Your First Story
         </Button>
         

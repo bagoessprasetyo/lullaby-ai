@@ -1,3 +1,4 @@
+// app/dashboard/library/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,6 +7,14 @@ import { useSession } from "next-auth/react";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +30,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-
+import { motion } from "framer-motion";
 import {
   Search,
   BookOpen,
@@ -41,56 +50,8 @@ import { StoryListItem } from "@/components/library/story-list-item";
 import { EmptyLibrary } from "@/components/library/empty-library";
 import { FavoriteStories } from "@/components/library/favorite-stories";
 import { RecentStories } from "@/components/library/recent-stories";
-
-// Mock data for stories
-export type Story = {
-  id: string;
-  title: string;
-  coverImage: string;
-  duration: number; // in seconds
-  language: string;
-  createdAt: Date;
-  isFavorite: boolean;
-  thumbnail: string;
-  backgroundMusic?: string;
-  characters: { name: string; description?: string }[];
-  tags: string[];
-};
-
-// Function to generate mock stories (in a real app, this would be an API call)
-const generateMockStories = (count: number): Story[] => {
-  const languages = ["english", "french", "japanese", "indonesian"];
-  const titles = [
-    "The Magical Forest Adventure",
-    "Journey to the Moon",
-    "Sammy's Birthday Surprise",
-    "The Friendly Dragon",
-    "Lost in the Ocean",
-    "Space Explorers",
-    "The Enchanted Garden",
-    "Dinosaur Discovery",
-    "The Brave Little Mouse",
-    "Underwater Kingdom"
-  ];
-  const backgroundMusic = ["calming", "soft", "peaceful", "soothing", "magical"];
-  
-  return Array.from({ length: count }).map((_, i) => ({
-    id: `story-${i + 1}`,
-    title: titles[Math.floor(Math.random() * titles.length)],
-    coverImage: `https://source.unsplash.com/random/300x300?bedtime,story&sig=${i}`,
-    duration: Math.floor(Math.random() * 300) + 60, // 1-6 minutes
-    language: languages[Math.floor(Math.random() * languages.length)],
-    createdAt: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000), // Last 30 days
-    isFavorite: Math.random() > 0.7,
-    thumbnail: `https://source.unsplash.com/random/100x100?bedtime,children&sig=${i}`,
-    backgroundMusic: backgroundMusic[Math.floor(Math.random() * backgroundMusic.length)],
-    characters: [
-      { name: "Emma", description: "A curious 8-year-old girl" },
-      { name: "Max", description: "Emma's pet dog" }
-    ],
-    tags: ["bedtime", "adventure", Math.random() > 0.5 ? "fantasy" : "animals"]
-  }));
-};
+import { Story } from "@/types/story"; 
+import { getStoriesWithFilters, toggleStoryFavorite, deleteStory } from "@/lib/services/story-service";
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -101,74 +62,82 @@ export default function LibraryPage() {
   const [filterLanguage, setFilterLanguage] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState("all");
   const [stories, setStories] = useState<Story[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Simulating data fetching
   useEffect(() => {
     const fetchStories = async () => {
+      if (!session?.user?.id) return;
+      
       setIsLoading(true);
-      // In a real app, this would be an API call
-      setTimeout(() => {
-        // Generate 0-10 stories to show empty state sometimes for demo
-        const storyCount = Math.floor(Math.random() * 11);
-        setStories(generateMockStories(storyCount));
+      try {
+        const { stories, count } = await getStoriesWithFilters(
+          session.user.id,
+          {
+            filterLanguage,
+            isFavorite: currentTab === "favorites" ? true : null,
+            searchQuery,
+            sortBy
+          }
+        );
+        
+        setStories(stories);
+        setTotalCount(count);
+      } catch (error) {
+        console.error("Error fetching stories:", error);
+      } finally {
         setIsLoading(false);
-      }, 1500);
+      }
     };
 
-    fetchStories();
-  }, []);
+    if (status === "authenticated") {
+      fetchStories();
+    }
+  }, [session, status, currentTab, filterLanguage, sortBy, searchQuery]);
 
-  // Filter and sort stories based on current criteria
-  const filteredStories = stories
-    .filter((story) => {
-      // Search filter
-      if (searchQuery && !story.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
+  const handleToggleFavorite = async (storyId: string, currentFavorite: boolean) => {
+    try {
+      const updatedStory = await toggleStoryFavorite(storyId, !currentFavorite);
       
-      // Language filter
-      if (filterLanguage && story.language !== filterLanguage) {
-        return false;
+      if (updatedStory) {
+        // Update local state
+        setStories(prevStories => 
+          prevStories.map(story => 
+            story.id === storyId 
+              ? {...story, is_favorite: !currentFavorite} 
+              : story
+          )
+        );
       }
-      
-      // Tab filter
-      if (currentTab === "favorites" && !story.isFavorite) {
-        return false;
-      }
-      
-      return true;
-    })
-    .sort((a, b) => {
-      // Sorting
-      switch (sortBy) {
-        case "newest":
-          return b.createdAt.getTime() - a.createdAt.getTime();
-        case "oldest":
-          return a.createdAt.getTime() - b.createdAt.getTime();
-        case "longest":
-          return b.duration - a.duration;
-        case "shortest":
-          return a.duration - b.duration;
-        case "title-asc":
-          return a.title.localeCompare(b.title);
-        case "title-desc":
-          return b.title.localeCompare(a.title);
-        default:
-          return 0;
-      }
-    });
-
-  const toggleFavorite = (id: string) => {
-    setStories((prevStories) =>
-      prevStories.map((story) =>
-        story.id === id ? { ...story, isFavorite: !story.isFavorite } : story
-      )
-    );
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
   };
 
-  const handleDeleteStory = (id: string) => {
-    setStories((prevStories) => prevStories.filter((story) => story.id !== id));
+  const handleDeleteStory = async (storyId: string) => {
+    if (window.confirm("Are you sure you want to delete this story? This action cannot be undone.")) {
+      try {
+        const success = await deleteStory(storyId);
+        
+        if (success) {
+          // Remove from local state
+          setStories(prevStories => prevStories.filter(story => story.id !== storyId));
+          setTotalCount(prev => prev - 1);
+        }
+      } catch (error) {
+        console.error("Error deleting story:", error);
+      }
+    }
+  };
+
+  const getLanguageName = (code: string) => {
+    switch (code) {
+      case "en": return "English";
+      case "fr": return "French";
+      case "ja": return "Japanese";
+      case "id": return "Indonesian";
+      default: return code;
+    }
   };
 
   if (status === "loading") {
@@ -196,9 +165,9 @@ export default function LibraryPage() {
           
           <Button
             onClick={() => router.push("/dashboard/create")}
-            className="bg-indigo-600 hover:bg-indigo-700 flex-shrink-0"
+            className="bg-indigo-600 hover:bg-indigo-700 flex-shrink-0 text-white"
           >
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 h-4 w-4 text-white" />
             Create New Story
           </Button>
         </div>
@@ -304,36 +273,36 @@ export default function LibraryPage() {
                       <DropdownMenuItem 
                         className={cn(
                           "cursor-pointer",
-                          filterLanguage === "english" && "bg-gray-800 text-indigo-300"
+                          filterLanguage === "en" && "bg-gray-800 text-indigo-300"
                         )}
-                        onClick={() => setFilterLanguage("english")}
+                        onClick={() => setFilterLanguage("en")}
                       >
                         <span>English 🇺🇸</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className={cn(
                           "cursor-pointer",
-                          filterLanguage === "french" && "bg-gray-800 text-indigo-300"
+                          filterLanguage === "fr" && "bg-gray-800 text-indigo-300"
                         )}
-                        onClick={() => setFilterLanguage("french")}
+                        onClick={() => setFilterLanguage("fr")}
                       >
                         <span>French 🇫🇷</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className={cn(
                           "cursor-pointer",
-                          filterLanguage === "japanese" && "bg-gray-800 text-indigo-300"
+                          filterLanguage === "ja" && "bg-gray-800 text-indigo-300"
                         )}
-                        onClick={() => setFilterLanguage("japanese")}
+                        onClick={() => setFilterLanguage("ja")}
                       >
                         <span>Japanese 🇯🇵</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className={cn(
                           "cursor-pointer",
-                          filterLanguage === "indonesian" && "bg-gray-800 text-indigo-300"
+                          filterLanguage === "id" && "bg-gray-800 text-indigo-300"
                         )}
-                        onClick={() => setFilterLanguage("indonesian")}
+                        onClick={() => setFilterLanguage("id")}
                       >
                         <span>Indonesian 🇮🇩</span>
                       </DropdownMenuItem>
@@ -380,9 +349,9 @@ export default function LibraryPage() {
             ) : (
               <>
                 <TabsContent value="all" className="pt-2">
-                  {stories.length === 0 ? (
+                  {totalCount === 0 ? (
                     <EmptyLibrary />
-                  ) : filteredStories.length === 0 ? (
+                  ) : stories.length === 0 ? (
                     <div className="text-center py-16 bg-gray-900/50 border border-gray-800 rounded-xl">
                       <div className="bg-gray-800/70 rounded-full p-3 inline-flex mb-4">
                         <Search className="h-6 w-6 text-gray-400" />
@@ -395,22 +364,54 @@ export default function LibraryPage() {
                     </div>
                   ) : viewMode === "grid" ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredStories.map((story) => (
+                      {stories.map((story) => (
                         <StoryCard
                           key={story.id}
-                          story={story}
-                          onToggleFavorite={() => toggleFavorite(story.id)}
+                          story={{
+                            id: story.id,
+                            title: story.title,
+                            coverImage: story.images && story.images.length > 0 
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
+                              : "https://via.placeholder.com/300x300?text=No+Image",
+                            duration: story.duration || 0,
+                            language: story.language || "en",
+                            createdAt: new Date(story.created_at),
+                            isFavorite: story.is_favorite,
+                            thumbnail: story.images && story.images.length > 0 
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}` 
+                              : "https://via.placeholder.com/100x100?text=No+Image",
+                            backgroundMusic: "", // TODO: Get from backend if needed
+                            characters: [], // TODO: Get from backend if needed
+                            tags: [], // TODO: Get from backend if needed
+                          }}
+                          onToggleFavorite={() => handleToggleFavorite(story.id, story.is_favorite)}
                           onDelete={() => handleDeleteStory(story.id)}
                         />
                       ))}
                     </div>
                   ) : (
                     <div className="flex flex-col gap-3">
-                      {filteredStories.map((story) => (
+                      {stories.map((story) => (
                         <StoryListItem
                           key={story.id}
-                          story={story}
-                          onToggleFavorite={() => toggleFavorite(story.id)}
+                          story={{
+                            id: story.id,
+                            title: story.title,
+                            coverImage: story.images && story.images.length > 0 
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
+                              : "https://via.placeholder.com/300x300?text=No+Image",
+                            duration: story.duration || 0,
+                            language: story.language || "en",
+                            createdAt: new Date(story.created_at),
+                            isFavorite: story.is_favorite,
+                            thumbnail: story.images && story.images.length > 0 
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}` 
+                              : "https://via.placeholder.com/100x100?text=No+Image",
+                            backgroundMusic: "", // TODO: Get from backend if needed
+                            characters: [], // TODO: Get from backend if needed
+                            tags: [], // TODO: Get from backend if needed
+                          }}
+                          onToggleFavorite={() => handleToggleFavorite(story.id, story.is_favorite)}
                           onDelete={() => handleDeleteStory(story.id)}
                         />
                       ))}
@@ -419,9 +420,9 @@ export default function LibraryPage() {
                 </TabsContent>
                 
                 <TabsContent value="favorites" className="pt-2">
-                  {stories.filter(s => s.isFavorite).length === 0 ? (
+                  {stories.filter(s => s.is_favorite).length === 0 ? (
                     <FavoriteStories />
-                  ) : filteredStories.length === 0 ? (
+                  ) : stories.length === 0 ? (
                     <div className="text-center py-16 bg-gray-900/50 border border-gray-800 rounded-xl">
                       <div className="bg-gray-800/70 rounded-full p-3 inline-flex mb-4">
                         <Search className="h-6 w-6 text-gray-400" />
@@ -434,22 +435,54 @@ export default function LibraryPage() {
                     </div>
                   ) : viewMode === "grid" ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredStories.map((story) => (
+                      {stories.map((story) => (
                         <StoryCard
                           key={story.id}
-                          story={story}
-                          onToggleFavorite={() => toggleFavorite(story.id)}
+                          story={{
+                            id: story.id,
+                            title: story.title,
+                            coverImage: story.images && story.images.length > 0 
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
+                              : "https://via.placeholder.com/300x300?text=No+Image",
+                            duration: story.duration || 0,
+                            language: story.language || "en",
+                            createdAt: new Date(story.created_at),
+                            isFavorite: story.is_favorite,
+                            thumbnail: story.images && story.images.length > 0 
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}` 
+                              : "https://via.placeholder.com/100x100?text=No+Image",
+                            backgroundMusic: "", // TODO: Get from backend if needed
+                            characters: [], // TODO: Get from backend if needed
+                            tags: [], // TODO: Get from backend if needed
+                          }}
+                          onToggleFavorite={() => handleToggleFavorite(story.id, story.is_favorite)}
                           onDelete={() => handleDeleteStory(story.id)}
                         />
                       ))}
                     </div>
                   ) : (
                     <div className="flex flex-col gap-3">
-                      {filteredStories.map((story) => (
+                      {stories.map((story) => (
                         <StoryListItem
                           key={story.id}
-                          story={story}
-                          onToggleFavorite={() => toggleFavorite(story.id)}
+                          story={{
+                            id: story.id,
+                            title: story.title,
+                            coverImage: story.images && story.images.length > 0 
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
+                              : "https://via.placeholder.com/300x300?text=No+Image",
+                            duration: story.duration || 0,
+                            language: story.language || "en",
+                            createdAt: new Date(story.created_at),
+                            isFavorite: story.is_favorite,
+                            thumbnail: story.images && story.images.length > 0 
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}` 
+                              : "https://via.placeholder.com/100x100?text=No+Image",
+                            backgroundMusic: "", // TODO: Get from backend if needed
+                            characters: [], // TODO: Get from backend if needed
+                            tags: [], // TODO: Get from backend if needed
+                          }}
+                          onToggleFavorite={() => handleToggleFavorite(story.id, story.is_favorite)}
                           onDelete={() => handleDeleteStory(story.id)}
                         />
                       ))}
@@ -462,7 +495,7 @@ export default function LibraryPage() {
         </div>
         
         {/* Recent Stories Section (only shown when there are stories) */}
-        {!isLoading && stories.length > 0 && (
+        {!isLoading && totalCount > 0 && (
           <div className="mt-12">
             <h2 className="text-xl font-semibold mb-4 text-white flex items-center">
               <Sparkles className="mr-2 h-5 w-5 text-indigo-400" />

@@ -1,0 +1,365 @@
+
+
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Set up storage buckets first (you'll need to create these in Supabase dashboard too)
+-- 1. user-uploads: For family photos uploaded by users
+-- 2. voice-profiles: For custom voice recordings
+-- 3. generated-stories: For final audio stories
+-- 4. background-music: For background music library
+
+-- Profiles table (extends Supabase auth.users)
+CREATE TABLE public.profiles (
+  id UUID REFERENCES auth.users(id) PRIMARY KEY,
+  email TEXT NOT NULL,
+  name TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_login_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  subscription_tier TEXT DEFAULT 'free' CHECK (subscription_tier IN ('free', 'premium', 'family')),
+  subscription_status TEXT DEFAULT 'active' CHECK (subscription_status IN ('active', 'cancelled', 'expired')),
+  subscription_expiry TIMESTAMP WITH TIME ZONE,
+  voice_credits INTEGER DEFAULT 0,
+  story_credits INTEGER DEFAULT 5
+);
+
+-- Background music library
+CREATE TABLE public.background_music (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  storage_path TEXT NOT NULL,
+  duration INTEGER NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('calming', 'soft', 'peaceful', 'soothing', 'magical')),
+  is_premium BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Voice profiles table
+CREATE TABLE public.voice_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  duration INTEGER,
+  last_used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Stories table
+CREATE TABLE public.stories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  text_content TEXT,
+  language TEXT DEFAULT 'en' CHECK (language IN ('en', 'fr', 'ja', 'id')),
+  duration INTEGER,
+  audio_url TEXT,
+  theme TEXT DEFAULT 'adventure' CHECK (theme IN ('adventure', 'fantasy', 'bedtime', 'educational', 'customized')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_favorite BOOLEAN DEFAULT false,
+  play_count INTEGER DEFAULT 0,
+  background_music_id UUID REFERENCES public.background_music(id),
+  voice_profile_id UUID REFERENCES public.voice_profiles(id),
+  storage_path TEXT
+);
+
+-- Images table
+CREATE TABLE public.images (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  story_id UUID REFERENCES public.stories(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  storage_path TEXT NOT NULL,
+  upload_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  analysis_result JSONB, -- Store the AI analysis result
+  sequence_index INTEGER NOT NULL -- Order in the story
+);
+
+-- Characters table
+CREATE TABLE public.characters (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  story_id UUID REFERENCES public.stories(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT
+);
+
+-- Play history table
+CREATE TABLE public.play_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  story_id UUID REFERENCES public.stories(id) ON DELETE CASCADE NOT NULL,
+  played_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  completed BOOLEAN DEFAULT false,
+  progress_percentage INTEGER DEFAULT 0
+);
+
+-- Story tags table
+CREATE TABLE public.story_tags (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  story_id UUID REFERENCES public.stories(id) ON DELETE CASCADE NOT NULL,
+  tag TEXT NOT NULL
+);
+
+-- Populate some initial background music
+INSERT INTO public.background_music (name, description, storage_path, duration, category, is_premium) VALUES
+('Gentle Lullaby', 'Soft piano melody perfect for sleeping', 'background-music/gentle-lullaby.mp3', 180, 'calming', false),
+('Ocean Waves', 'Soothing ocean sounds with gentle background melody', 'background-music/ocean-waves.mp3', 240, 'peaceful', false),
+('Dreamy Night', 'Ethereal ambient music with soft synths', 'background-music/dreamy-night.mp3', 210, 'soft', true),
+('Starlight Dreams', 'Magical twinkling sounds with gentle harp', 'background-music/starlight-dreams.mp3', 195, 'magical', true),
+('Rainfall', 'Gentle rain with soft piano in background', 'background-music/rainfall.mp3', 220, 'soothing', false);
+
+-- Create indexes for performance
+CREATE INDEX idx_stories_user_id ON public.stories(user_id);
+CREATE INDEX idx_stories_created_at ON public.stories(created_at);
+CREATE INDEX idx_voice_profiles_user_id ON public.voice_profiles(user_id);
+CREATE INDEX idx_images_story_id ON public.images(story_id);
+CREATE INDEX idx_play_history_user_id ON public.play_history(user_id);
+CREATE INDEX idx_play_history_story_id ON public.play_history(story_id);
+CREATE INDEX idx_play_history_played_at ON public.play_history(played_at);
+CREATE INDEX idx_story_tags_story_id ON public.story_tags(story_id);
+CREATE INDEX idx_story_tags_tag ON public.story_tags(tag);
+
+-- Enable Row Level Security on all tables
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.images ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.voice_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.characters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.play_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.story_tags ENABLE ROW LEVEL SECURITY;
+-- Background music doesn't need RLS as it's shared content
+
+-- Create RLS policies
+-- Profiles
+CREATE POLICY "Users can view their own profile" 
+ON public.profiles FOR SELECT 
+USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own profile" 
+ON public.profiles FOR UPDATE 
+USING (auth.uid() = id);
+
+-- Stories
+CREATE POLICY "Users can view their own stories" 
+ON public.stories FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own stories" 
+ON public.stories FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own stories" 
+ON public.stories FOR UPDATE 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own stories" 
+ON public.stories FOR DELETE 
+USING (auth.uid() = user_id);
+
+-- Images
+CREATE POLICY "Users can view their own images" 
+ON public.images FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own images" 
+ON public.images FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own images" 
+ON public.images FOR UPDATE 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own images" 
+ON public.images FOR DELETE 
+USING (auth.uid() = user_id);
+
+-- Voice profiles
+CREATE POLICY "Users can view their own voice profiles" 
+ON public.voice_profiles FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own voice profiles" 
+ON public.voice_profiles FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own voice profiles" 
+ON public.voice_profiles FOR UPDATE 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own voice profiles" 
+ON public.voice_profiles FOR DELETE 
+USING (auth.uid() = user_id);
+
+-- Characters
+CREATE POLICY "Users can view characters for their stories" 
+ON public.characters FOR SELECT 
+USING (EXISTS (
+  SELECT 1 FROM public.stories 
+  WHERE stories.id = characters.story_id 
+  AND stories.user_id = auth.uid()
+));
+
+CREATE POLICY "Users can insert characters for their stories" 
+ON public.characters FOR INSERT 
+WITH CHECK (EXISTS (
+  SELECT 1 FROM public.stories 
+  WHERE stories.id = characters.story_id 
+  AND stories.user_id = auth.uid()
+));
+
+CREATE POLICY "Users can update characters for their stories" 
+ON public.characters FOR UPDATE 
+USING (EXISTS (
+  SELECT 1 FROM public.stories 
+  WHERE stories.id = characters.story_id 
+  AND stories.user_id = auth.uid()
+));
+
+CREATE POLICY "Users can delete characters for their stories" 
+ON public.characters FOR DELETE 
+USING (EXISTS (
+  SELECT 1 FROM public.stories 
+  WHERE stories.id = characters.story_id 
+  AND stories.user_id = auth.uid()
+));
+
+-- Play history
+CREATE POLICY "Users can view their own play history" 
+ON public.play_history FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own play history" 
+ON public.play_history FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own play history" 
+ON public.play_history FOR UPDATE 
+USING (auth.uid() = user_id);
+
+-- Story tags
+CREATE POLICY "Users can view tags for their stories" 
+ON public.story_tags FOR SELECT 
+USING (EXISTS (
+  SELECT 1 FROM public.stories 
+  WHERE stories.id = story_tags.story_id 
+  AND stories.user_id = auth.uid()
+));
+
+CREATE POLICY "Users can insert tags for their stories" 
+ON public.story_tags FOR INSERT 
+WITH CHECK (EXISTS (
+  SELECT 1 FROM public.stories 
+  WHERE stories.id = story_tags.story_id 
+  AND stories.user_id = auth.uid()
+));
+
+CREATE POLICY "Users can delete tags for their stories" 
+ON public.story_tags FOR DELETE 
+USING (EXISTS (
+  SELECT 1 FROM public.stories 
+  WHERE stories.id = story_tags.story_id 
+  AND stories.user_id = auth.uid()
+));
+
+-- Add trigger to decrement story credits when a new story is created
+CREATE OR REPLACE FUNCTION decrement_story_credits()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.profiles
+  SET story_credits = story_credits - 1
+  WHERE id = NEW.user_id AND story_credits > 0;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_decrement_story_credits
+AFTER INSERT ON public.stories
+FOR EACH ROW
+EXECUTE FUNCTION decrement_story_credits();
+
+-- Add trigger to update user last_login_at on auth.users sign in
+CREATE OR REPLACE FUNCTION update_last_login_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.profiles
+  SET last_login_at = NOW()
+  WHERE id = NEW.id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_last_login
+AFTER UPDATE ON auth.users
+FOR EACH ROW
+WHEN (OLD.last_sign_in_at IS DISTINCT FROM NEW.last_sign_in_at)
+EXECUTE FUNCTION update_last_login_timestamp();
+
+-- Add trigger to create user profile when user registers
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, name, avatar_url)
+  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'name', NEW.raw_user_meta_data->>'avatar_url');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_handle_new_user
+AFTER INSERT ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION handle_new_user();
+
+CREATE TABLE public.payment_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES public.profiles(id) NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  currency TEXT DEFAULT 'USD',
+  payment_method TEXT,
+  status TEXT CHECK (status IN ('succeeded', 'failed', 'pending')),
+  provider_transaction_id TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE public.subscription_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES public.profiles(id) NOT NULL,
+  event_type TEXT CHECK (event_type IN ('created', 'renewed', 'cancelled', 'changed', 'failed')),
+  previous_tier TEXT,
+  new_tier TEXT,
+  effective_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);CREATE TABLE public.family_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  owner_id UUID REFERENCES public.profiles(id) NOT NULL,
+  member_id UUID REFERENCES public.profiles(id) NOT NULL,
+  relationship TEXT CHECK (relationship IN ('parent', 'child', 'other')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE public.shared_stories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  story_id UUID REFERENCES public.stories(id) NOT NULL,
+  shared_by UUID REFERENCES public.profiles(id) NOT NULL,
+  shared_with UUID REFERENCES public.profiles(id),
+  shared_email TEXT,
+  access_code TEXT,
+  expires_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);CREATE TABLE public.user_preferences (
+  user_id UUID REFERENCES public.profiles(id) PRIMARY KEY,
+  default_language TEXT DEFAULT 'en',
+  default_theme TEXT DEFAULT 'adventure',
+  default_voice_profile_id UUID REFERENCES public.voice_profiles(id),
+  default_background_music_id UUID REFERENCES public.background_music(id),
+  email_notifications BOOLEAN DEFAULT true,
+  theme_mode TEXT DEFAULT 'dark' CHECK (theme_mode IN ('dark', 'light', 'system')),
+  auto_play BOOLEAN DEFAULT false
+);CREATE TABLE public.story_feedback (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  story_id UUID REFERENCES public.stories(id) NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) NOT NULL,
+  rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+  feedback_text TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
