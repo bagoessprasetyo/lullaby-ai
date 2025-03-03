@@ -3,23 +3,28 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Play, Clock, BookMarked } from "lucide-react";
-import { Story } from "@/app/dashboard/library/page";
 import { formatDuration } from "@/lib/format-duration";
 
+interface RecentStoryItem {
+  id: string;
+  title: string;
+  thumbnail: string;
+  duration: number;
+  isFavorite: boolean;
+  language: string;
+}
+
 interface RecentStoriesProps {
-  stories: Story[];
+  stories: RecentStoryItem[];
 }
 
 export function RecentStories({ stories }: RecentStoriesProps) {
   const router = useRouter();
   
-  // Take the first 3 stories for the recent view
-  const recentStories = stories.slice(0, 3);
-  
   return (
     <div className="bg-gray-900/50 rounded-lg border border-gray-800 p-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {recentStories.map((story) => (
+        {stories.map((story) => (
           <div 
             key={story.id}
             className="flex items-center gap-4 cursor-pointer"
@@ -53,13 +58,20 @@ export function RecentStories({ stories }: RecentStoriesProps) {
                 {story.title}
               </h4>
               <p className="text-xs text-gray-400 truncate">
-                Last played a few days ago
+                {story.language === 'en' ? 'English' : 
+                 story.language === 'fr' ? 'French' : 
+                 story.language === 'ja' ? 'Japanese' : 
+                 story.language === 'id' ? 'Indonesian' : story.language}
               </p>
               
               <Button
                 variant="ghost" 
                 size="sm" 
                 className="mt-1 h-8 px-2.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/dashboard/stories/${story.id}/play`);
+                }}
               >
                 <Play className="h-3 w-3 mr-1" />
                 <span className="text-xs">Play Now</span>

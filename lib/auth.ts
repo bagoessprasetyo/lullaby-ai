@@ -1,10 +1,55 @@
-// lib/auth.ts
-import { supabaseAdmin } from '@/lib/supabase';
+// auth.ts
+import { cookies } from 'next/headers';
+import { supabaseAdmin, createClient } from '@/lib/supabase';
 import { AuthUser, UserProfile } from '@/types/user';
 import { v5 as uuidv5 } from 'uuid';
 
 // Define a UUID namespace (using a constant UUID)
 const UUID_NAMESPACE = '1b671a64-40d5-491e-99b0-da01ff1f3341';
+
+/**
+ * Gets the current user session on the server
+ * - For server components and server actions
+ */
+export async function auth() {
+  try {
+    // Create a Supabase client using the stored cookies
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
+    
+    // Get the session from Supabase
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) {
+      console.log('No active session found');
+      return null;
+    }
+    
+    // Find the user profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+    
+    if (!profile) {
+      return null;
+    }
+    
+    return {
+      user: {
+        id: profile.id,
+        email: profile.email,
+        name: profile.name
+      }
+    };
+  } catch (error) {
+    console.error('Error in auth function:', error);
+    return null;
+  }
+}
+
+// Mock auth function for development if needed
 
 export async function syncUserWithSupabase(user: AuthUser): Promise<UserProfile | null> {
   console.log('Syncing user to Supabase:', user.id);

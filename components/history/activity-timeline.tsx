@@ -7,23 +7,14 @@ import { Progress } from "@/components/ui/progress";
 import { 
   Play, 
   RotateCcw, 
-  ThumbsUp 
+  ThumbsUp,
+  Search
 } from "lucide-react";
 import { formatDuration } from "@/lib/format-duration";
-
-type StoryPlay = {
-  id: string;
-  storyId: string;
-  storyTitle: string;
-  coverImage: string;
-  playedAt: Date;
-  duration: number; // in seconds
-  completed: boolean;
-  progress?: number; // 0-100
-};
+import { PlayHistoryEntry } from "@/lib/services/history-service";
 
 interface ActivityTimelineProps {
-  plays: StoryPlay[];
+  plays: PlayHistoryEntry[];
   onResume?: (storyId: string) => void;
 }
 
@@ -50,14 +41,14 @@ export function ActivityTimeline({
   };
   
   // Group plays by date for better display
-  const groupedPlays: { [key: string]: StoryPlay[] } = plays.reduce((acc, play) => {
+  const groupedPlays: { [key: string]: PlayHistoryEntry[] } = plays.reduce((acc, play) => {
     const dateKey = formatDate(play.playedAt);
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
     acc[dateKey].push(play);
     return acc;
-  }, {} as { [key: string]: StoryPlay[] });
+  }, {} as { [key: string]: PlayHistoryEntry[] });
   
   // Convert grouped plays to array for rendering
   const groupedPlaysArray = Object.entries(groupedPlays).map(([date, plays]) => ({
@@ -84,11 +75,12 @@ export function ActivityTimeline({
     return (
       <div className="text-center py-16 bg-gray-900/50 border border-gray-800 rounded-xl">
         <div className="bg-gray-800/70 rounded-full p-3 inline-flex mb-4">
-          <Play className="h-6 w-6 text-gray-400" />
+          <Search className="h-6 w-6 text-gray-400" />
         </div>
-        <h3 className="text-xl font-semibold text-white mb-2">No activity yet</h3>
+        <h3 className="text-xl font-semibold text-white mb-2">No activity found</h3>
         <p className="text-gray-400 max-w-md mx-auto">
-          Your listening history will appear here once you start playing stories.
+          We couldn't find any listening activity matching your current filters.
+          Try adjusting your search or time period.
         </p>
       </div>
     );
@@ -105,12 +97,12 @@ export function ActivityTimeline({
           </div>
           
           <div className="space-y-6">
-            {plays.map((play) => (
+            {plays.map((play, index) => (
               <div 
                 key={play.id}
                 className="relative pl-8 pb-6"
                 style={{
-                  borderLeft: plays.indexOf(play) === plays.length - 1 ? 'none' : '1px dashed rgb(75, 85, 99)',
+                  borderLeft: index === plays.length - 1 ? 'none' : '1px dashed rgb(75, 85, 99)',
                   marginLeft: '0.5rem'
                 }}
               >

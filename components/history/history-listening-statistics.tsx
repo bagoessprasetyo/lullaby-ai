@@ -1,416 +1,225 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from "@/components/ui/tabs";
-import {
-  BarChart,
-  Clock,
-  Calendar,
-  Star,
-  Play,
-  TrendingUp,
-  PieChart as PieChartIcon,
-  MoveVertical
-} from "lucide-react";
-import { formatDuration } from "@/lib/format-duration";
+import { Clock, BarChart3 } from "lucide-react";
+import { fetchListeningPatterns } from "@/app/dashboard/history/actions";
 
-// Types for statistics data
-type StatisticsData = {
-  totalPlays: number;
-  totalDuration: number; // in seconds
-  averageListeningTime: number; // in seconds
-  totalStories: number;
-  completionRate: number; // percentage
-  mostActiveDay: string;
-  mostActiveHour: number;
-  popularTags: { name: string; count: number }[];
-  topStories: {
-    id: string;
-    title: string;
-    coverImage: string;
-    playCount: number;
-    duration: number;
-  }[];
-  weekdayDistribution: { day: string; count: number }[];
-  hourlyDistribution: { hour: number; count: number }[];
-};
-
-interface StoryStatisticsProps {
-  timeframe?: "week" | "month" | "year" | "all";
+interface ListeningPatternsData {
+  hourlyDistribution: {hour: number, count: number}[];
+  weekdayDistribution: {day: string, count: number}[];
 }
 
-export function StoryStatistics({ timeframe = "month" }: StoryStatisticsProps) {
-  const [activeTab, setActiveTab] = useState("overview");
-  
-  // Mock data - in a real application, this would come from an API
-  const mockStatistics: StatisticsData = {
-    totalPlays: 42,
-    totalDuration: 9360, // 2 hours 36 minutes
-    averageListeningTime: 223, // 3 minutes 43 seconds
-    totalStories: 15,
-    completionRate: 87,
-    mostActiveDay: "Saturday",
-    mostActiveHour: 20, // 8PM
-    popularTags: [
-      { name: "adventure", count: 18 },
-      { name: "animals", count: 14 },
-      { name: "fantasy", count: 12 },
-      { name: "bedtime", count: 9 },
-      { name: "nature", count: 6 }
-    ],
-    topStories: [
-      {
-        id: "story-1",
-        title: "Emma's Magical Forest Adventure",
-        coverImage: "https://source.unsplash.com/random/300x300?forest,magic&sig=1",
-        playCount: 8,
-        duration: 240
-      },
-      {
-        id: "story-2",
-        title: "The Dragon's Secret",
-        coverImage: "https://source.unsplash.com/random/300x300?dragon&sig=2",
-        playCount: 6,
-        duration: 320
-      },
-      {
-        id: "story-3",
-        title: "Journey to the Moon",
-        coverImage: "https://source.unsplash.com/random/300x300?moon,space&sig=3",
-        playCount: 5,
-        duration: 180
-      }
-    ],
-    weekdayDistribution: [
-      { day: "Monday", count: 3 },
-      { day: "Tuesday", count: 5 },
-      { day: "Wednesday", count: 4 },
-      { day: "Thursday", count: 6 },
-      { day: "Friday", count: 7 },
-      { day: "Saturday", count: 10 },
-      { day: "Sunday", count: 7 }
-    ],
-    hourlyDistribution: [
-      { hour: 17, count: 4 }, // 5PM
-      { hour: 18, count: 6 }, // 6PM
-      { hour: 19, count: 9 }, // 7PM
-      { hour: 20, count: 12 }, // 8PM
-      { hour: 21, count: 8 }, // 9PM
-      { hour: 22, count: 3 } // 10PM
-    ]
-  };
-  
-  const formatHour = (hour: number) => {
-    return new Date(2000, 0, 1, hour, 0, 0).toLocaleTimeString([], { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-  
-  const getTimeframeLabel = () => {
+interface StoryStatisticsProps {
+  timeframe: 'week' | 'month' | 'year' | 'all';
+  listeningPatterns?: ListeningPatternsData | null;
+  userId?: string;
+}
+
+export function StoryStatistics({ 
+  timeframe,
+  listeningPatterns: initialPatterns,
+  userId 
+}: StoryStatisticsProps) {
+  const [listeningPatterns, setListeningPatterns] = useState<ListeningPatternsData | null>(initialPatterns || null);
+  const [isLoading, setIsLoading] = useState(!initialPatterns);
+  const [error, setError] = useState<string | null>(null);
+
+  // Convert timeframe to server action format
+  const getTimeRange = (timeframe: string) => {
     switch (timeframe) {
-      case "week": return "this week";
-      case "month": return "this month";
-      case "year": return "this year";
-      case "all": return "all time";
-      default: return "this month";
+      case 'week': return '7days';
+      case 'month': return '30days';
+      case 'year': return '90days';
+      default: return 'all';
     }
   };
-  
-  // Function to generate SVG chart bar visualization
-  const generateBarChart = (data: { label: string; value: number }[], maxHeight = 100) => {
-    const maxValue = Math.max(...data.map(d => d.value));
+
+  // If patterns weren't provided, fetch them
+  useEffect(() => {
+    if (!userId) return;
     
+    // If we already have patterns for this timeframe, don't fetch again
+    if (initialPatterns && !isLoading) return;
+    
+    console.log('StoryStatistics: Fetching patterns for timeframe:', timeframe);
+    
+    const fetchPatterns = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const timeRange = getTimeRange(timeframe);
+        
+        // Use server action
+        const patterns = await fetchListeningPatterns(timeRange);
+        
+        console.log('StoryStatistics: Received patterns:', {
+          received: !!patterns,
+          hourlyData: patterns?.hourlyDistribution?.length || 0,
+          weekdayData: patterns?.weekdayDistribution?.length || 0,
+        });
+        
+        if (patterns) {
+          setListeningPatterns(patterns);
+        } else {
+          setError("No listening data available for this time period.");
+        }
+      } catch (error) {
+        console.error("Error fetching listening patterns:", error);
+        setError("Failed to load listening insights. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchPatterns();
+  }, [timeframe, userId, initialPatterns, isLoading]);
+
+  // Helper to determine the maximum value for scaling
+  const getMaxValue = (data: {count: number}[]) => {
+    return Math.max(...data.map(item => item.count), 1);
+  };
+
+  if (isLoading) {
     return (
-      <div className="flex items-end h-40 gap-1 mt-4">
-        {data.map((item, index) => {
-          const heightPercentage = (item.value / maxValue) * 100;
-          const barHeight = (heightPercentage / 100) * maxHeight;
-          
-          return (
-            <div key={index} className="flex flex-col items-center justify-end flex-1">
-              <div 
-                className="w-full bg-indigo-500/80 rounded-t-sm hover:bg-indigo-400 transition-colors relative group"
-                style={{ height: `${barHeight}%` }}
-              >
-                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  {item.value}
-                </div>
-              </div>
-              <span className="text-xs text-gray-400 mt-1 truncate w-full text-center">
-                {item.label}
-              </span>
-            </div>
-          );
-        })}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="bg-gray-900/50 border border-gray-800">
+          <CardContent className="p-6 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+            <p className="text-gray-400">Loading listening patterns...</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gray-900/50 border border-gray-800">
+          <CardContent className="p-6 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500 mb-4"></div>
+            <p className="text-gray-400">Loading day patterns...</p>
+          </CardContent>
+        </Card>
       </div>
     );
-  };
+  }
+
+  if (error) {
+    return (
+      <Card className="bg-gray-900/50 border border-gray-800">
+        <CardContent className="p-6 text-center">
+          <p className="text-gray-400">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!listeningPatterns) {
+    return (
+      <Card className="bg-gray-900/50 border border-gray-800">
+        <CardContent className="p-6 text-center">
+          <p className="text-gray-400">No listening data available for this time period.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Make sure data is properly sorted
+  const sortedHourlyData = [...listeningPatterns.hourlyDistribution].sort((a, b) => a.hour - b.hour);
   
+  // Sort weekday data to start with Monday
+  const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const sortedWeekdayData = [...listeningPatterns.weekdayDistribution].sort((a, b) => {
+    return weekdayOrder.indexOf(a.day) - weekdayOrder.indexOf(b.day);
+  });
+
+  // Get maximum values for scaling
+  const maxHourlyCount = getMaxValue(sortedHourlyData);
+  const maxWeekdayCount = getMaxValue(sortedWeekdayData);
+
   return (
-    <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-gray-900/70 border border-gray-800 p-1">
-          <TabsTrigger
-            value="overview"
-            className="data-[state=active]:bg-gray-800 data-[state=active]:text-white"
-          >
-            <BarChart className="h-4 w-4 mr-2" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger
-            value="patterns"
-            className="data-[state=active]:bg-gray-800 data-[state=active]:text-white"
-          >
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Listening Patterns
-          </TabsTrigger>
-          <TabsTrigger
-            value="stories"
-            className="data-[state=active]:bg-gray-800 data-[state=active]:text-white"
-          >
-            <Star className="h-4 w-4 mr-2" />
-            Top Stories
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="mt-4 space-y-6">
-          <Card className="bg-gray-900/50 border border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center text-lg">
-                <BarChart className="h-5 w-5 mr-2 text-indigo-400" />
-                Listening Overview {getTimeframeLabel()}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-                  <div className="text-sm text-gray-400">Total Plays</div>
-                  <div className="text-2xl font-bold text-white mt-1">
-                    {mockStatistics.totalPlays}
-                  </div>
-                </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Time of Day Listening */}
+      <Card className="bg-gray-900/50 border border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center text-lg">
+            <Clock className="h-5 w-5 mr-2 text-indigo-400" />
+            Listening Hours
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            {/* Visualization of hourly distribution */}
+            <div className="flex h-full items-end space-x-1">
+              {sortedHourlyData.map((item) => {
+                const percentage = Math.max(
+                  5,
+                  (item.count / maxHourlyCount) * 100
+                );
                 
-                <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-                  <div className="text-sm text-gray-400">Total Time</div>
-                  <div className="text-2xl font-bold text-white mt-1">
-                    {formatDuration(mockStatistics.totalDuration)}
-                  </div>
-                </div>
+                // Format hour for display (12-hour format)
+                const hourDisplay = item.hour % 12 === 0 ? 12 : item.hour % 12;
+                const amPm = item.hour < 12 ? 'am' : 'pm';
                 
-                <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-                  <div className="text-sm text-gray-400">Avg. Listen Time</div>
-                  <div className="text-2xl font-bold text-white mt-1">
-                    {formatDuration(mockStatistics.averageListeningTime)}
-                  </div>
-                </div>
-                
-                <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-                  <div className="text-sm text-gray-400">Completion Rate</div>
-                  <div className="text-2xl font-bold text-white mt-1">
-                    {mockStatistics.completionRate}%
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-6 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-                <h4 className="font-medium text-white mb-2 flex items-center">
-                  <Star className="h-4 w-4 mr-2 text-amber-400" />
-                  Most Popular Tags
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {mockStatistics.popularTags.map((tag, index) => (
-                    <Badge key={index} className="bg-indigo-900/50 text-indigo-300">
-                      {tag.name} ({tag.count})
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="patterns" className="mt-4 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-gray-900/50 border border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center text-lg">
-                  <Calendar className="h-5 w-5 mr-2 text-indigo-400" />
-                  Day of Week Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {generateBarChart(
-                  mockStatistics.weekdayDistribution.map(item => ({
-                    label: item.day.substring(0, 3),
-                    value: item.count
-                  }))
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gray-900/50 border border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center text-lg">
-                  <Clock className="h-5 w-5 mr-2 text-indigo-400" />
-                  Hourly Distribution
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {generateBarChart(
-                  mockStatistics.hourlyDistribution.map(item => ({
-                    label: formatHour(item.hour),
-                    value: item.count
-                  }))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card className="bg-gray-900/50 border border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center text-lg">
-                <MoveVertical className="h-5 w-5 mr-2 text-indigo-400" />
-                Key Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                  <div className="mt-1">
-                    <div className="bg-indigo-900/40 p-1 rounded-full">
-                      <Clock className="h-4 w-4 text-indigo-400" />
-                    </div>
-                  </div>
-                  <div>
-                    <h5 className="font-medium text-white">Peak Listening Time</h5>
-                    <p className="text-sm text-gray-400">
-                      Most stories are listened to at <span className="text-indigo-300 font-medium">8:00 PM</span> in the evening. 
-                      This suggests stories are part of the bedtime routine.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                  <div className="mt-1">
-                    <div className="bg-amber-900/40 p-1 rounded-full">
-                      <Calendar className="h-4 w-4 text-amber-400" />
-                    </div>
-                  </div>
-                  <div>
-                    <h5 className="font-medium text-white">Weekend Preference</h5>
-                    <p className="text-sm text-gray-400">
-                      Listening activity increases by <span className="text-amber-300 font-medium">42%</span> on weekends, 
-                      with Saturday being the most active day.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                  <div className="mt-1">
-                    <div className="bg-green-900/40 p-1 rounded-full">
-                      <TrendingUp className="h-4 w-4 text-green-400" />
-                    </div>
-                  </div>
-                  <div>
-                    <h5 className="font-medium text-white">Consistent Habits</h5>
-                    <p className="text-sm text-gray-400">
-                      Your child listens to stories at a consistent time each day,
-                      which is great for establishing bedtime routines.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="stories" className="mt-4 space-y-6">
-          <Card className="bg-gray-900/50 border border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center text-lg">
-                <Star className="h-5 w-5 mr-2 text-amber-400" />
-                Most Listened Stories
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mockStatistics.topStories.map((story, index) => (
+                return (
                   <div 
-                    key={story.id}
-                    className="flex items-center gap-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700"
+                    key={item.hour} 
+                    className="flex-1 flex flex-col items-center"
                   >
-                    <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 bg-gray-700 rounded-full text-white font-bold">
-                      {index + 1}
+                    <div 
+                      className="w-full bg-indigo-700/80 rounded-t-sm hover:bg-indigo-600 transition-colors"
+                      style={{ height: `${percentage}%` }}
+                    ></div>
+                    <div className="text-xs text-gray-400 mt-2 whitespace-nowrap">
+                      {hourDisplay}{amPm}
                     </div>
-                    
-                    <div className="flex-shrink-0 w-12 h-12 rounded-md overflow-hidden">
-                      <img 
-                        src={story.coverImage} 
-                        alt={story.title}
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="text-xs text-gray-500 mt-1">
+                      {item.count}
                     </div>
-                    
-                    <div className="flex-grow min-w-0">
-                      <h5 className="font-medium text-white truncate">
-                        {story.title}
-                      </h5>
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <span className="flex items-center">
-                          <Play className="h-3 w-3 mr-1" />
-                          {story.playCount} times
-                        </span>
-                        <span className="opacity-60">•</span>
-                        <span className="flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {formatDuration(story.duration)}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <Badge className="bg-amber-900/50 text-amber-300 flex-shrink-0">
-                      <Star className="h-3 w-3 mr-1" />
-                      Favorite
-                    </Badge>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gray-900/50 border border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center text-lg">
-                <PieChartIcon className="h-5 w-5 mr-2 text-indigo-400" />
-                Content Preferences
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-6 h-64 flex items-center justify-center">
-                {/* In a real app, this would be a chart component */}
-                <div className="text-center">
-                  <PieChartIcon className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                  <p className="text-gray-400">
-                    Content preference visualization would go here
-                  </p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Showing distribution of story categories
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Day of Week Listening */}
+      <Card className="bg-gray-900/50 border border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center text-lg">
+            <BarChart3 className="h-5 w-5 mr-2 text-green-400" />
+            Listening Days
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            {/* Visualization of weekday distribution */}
+            <div className="flex h-full items-end space-x-2">
+              {sortedWeekdayData.map((item) => {
+                const percentage = Math.max(
+                  5,
+                  (item.count / maxWeekdayCount) * 100
+                );
+                
+                return (
+                  <div 
+                    key={item.day} 
+                    className="flex-1 flex flex-col items-center"
+                  >
+                    <div 
+                      className="w-full bg-green-700/80 rounded-t-sm hover:bg-green-600 transition-colors"
+                      style={{ height: `${percentage}%` }}
+                    ></div>
+                    <div className="text-xs text-gray-400 mt-2">
+                      {item.day.substring(0, 3)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {item.count}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

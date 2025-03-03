@@ -1,5 +1,7 @@
+// components/story-creation/review-step.tsx
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ImageIcon,
@@ -9,13 +11,18 @@ import {
   Globe,
   Sparkles,
   PencilIcon,
-  Lock
+  Lock,
+  AlertCircle
 } from "lucide-react";
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { generateStory } from "@/lib/api/storyGeneration";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { createApiServices } from "@/lib/api/apiService";
 
 interface ReviewStepProps {
   formData: StoryFormData;
@@ -26,10 +33,13 @@ interface ReviewStepProps {
 
 export function ReviewStep({ 
   formData, 
+  updateFormData,
   isSubscriber,
   onGenerateStory
 }: ReviewStepProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const [generationError, setGenerationError] = useState<string | null>(null);
   
   const durationMap = {
     short: "1 minute",
@@ -51,6 +61,43 @@ export function ReviewStep({
     soothing: "Soothing",
     magical: "Magical"
   };
+
+  const handleGenerateStory = async () => {
+    // Reset error state
+    setGenerationError(null);
+    
+    // Begin generation process
+    updateFormData("isGenerating", true);
+    
+    try {
+      if (!session) {
+        throw new Error("You must be logged in to generate a story");
+      }
+      
+      // Use async generation for better UX
+      const useAsyncGeneration = true;
+      const apiServices = createApiServices(session);
+      if (useAsyncGeneration) {
+        // Set generating state and let the async component handle the rest
+        onGenerateStory();
+      } else {
+        // Call the API directly (synchronous approach)
+        const result = await apiServices.story.generateStory(formData);
+        
+        if (!result.success) {
+          throw new Error(result.error || "Failed to generate story");
+        }
+        
+        // Redirect to the story view page
+        router.push(`/dashboard/stories/${result.storyId}`);
+      }
+      
+    } catch (error) {
+      console.error("Story generation error:", error);
+      updateFormData("isGenerating", false);
+      setGenerationError(error instanceof Error ? error.message : "An unknown error occurred");
+    }
+  };
   
   return (
     <div className="space-y-6">
@@ -60,6 +107,16 @@ export function ReviewStep({
           Review your story details before generating
         </p>
       </div>
+      
+      {/* Error Alert */}
+      {generationError && (
+        <Alert variant="destructive" className="bg-red-900/20 border-red-800">
+          <AlertCircle className="h-4 w-4 text-red-400" />
+          <AlertDescription className="text-red-300">
+            {generationError}
+          </AlertDescription>
+        </Alert>
+      )}
       
       <Card className="bg-gray-900 border-gray-800 p-6 space-y-6">
         {/* Photos */}
@@ -112,7 +169,7 @@ export function ReviewStep({
               variant="ghost" 
               size="sm" 
               className="text-gray-400 h-8"
-              onClick={() => router.push("/dashboard/create?step=1")}
+              onClick={() => router.push("/dashboard/create?step=2")}
             >
               <PencilIcon className="h-3 w-3 mr-1" />
               Edit
@@ -196,7 +253,7 @@ export function ReviewStep({
       {/* Generate Button */}
       <div className="flex flex-col items-center justify-center pt-4">
         <Button 
-          onClick={onGenerateStory}
+          onClick={handleGenerateStory}
           disabled={formData.isGenerating}
           className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 w-full md:w-auto md:min-w-[200px] h-12"
           size="lg"

@@ -9,15 +9,19 @@ import {
   Calendar,
   Trophy,
   Flame,
+  Check,
+  X
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getStreakHistory, getLastListenedDate } from "@/lib/services/history-service";
 
 interface ListeningStreakProps {
   currentStreak: number;
   longestStreak: number;
   lastListenedDate?: Date | null;
   streakHistory?: boolean[]; // Array of last 7 days (true = listened, false = not listened)
+  userId?: string;
   className?: string;
 }
 
@@ -25,17 +29,62 @@ export function ListeningStreak({
   currentStreak = 0,
   longestStreak = 0,
   lastListenedDate = null,
-  streakHistory = [false, true, true, true, false, false, true], // last 7 days by default
+  streakHistory,
+  userId,
   className,
 }: ListeningStreakProps) {
   const [animateStreak, setAnimateStreak] = useState(false);
+  const [loadedStreakHistory, setLoadedStreakHistory] = useState<boolean[]>([]);
+  const [loadedLastListenedDate, setLoadedLastListenedDate] = useState<Date | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Load streak history and last listened date if not provided
+  useEffect(() => {
+    const loadData = async () => {
+      if (!userId) return;
+      
+      if (!streakHistory || !lastListenedDate) {
+        setIsLoading(true);
+        
+        try {
+          // Load streak history
+          if (!streakHistory) {
+            const history = await getStreakHistory(userId);
+            setLoadedStreakHistory(history);
+          }
+          
+          // Load last listened date
+          if (!lastListenedDate) {
+            const date = await getLastListenedDate(userId);
+            setLoadedLastListenedDate(date);
+          }
+        } catch (error) {
+          console.error("Error loading streak data:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    loadData();
+  }, [userId, streakHistory, lastListenedDate]);
+  
+  // Animate streak counter on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimateStreak(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
   
   // Determine if streak is active today
   const isStreakActiveToday = () => {
-    if (!lastListenedDate) return false;
+    const date = lastListenedDate || loadedLastListenedDate;
+    if (!date) return false;
     
     const today = new Date();
-    const lastListened = new Date(lastListenedDate);
+    const lastListened = new Date(date);
     
     return (
       today.getDate() === lastListened.getDate() &&
@@ -62,15 +111,6 @@ export function ListeningStreak({
     return "Legendary dedication! You're a bedtime story champion!";
   };
   
-  // Animate streak counter on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setAnimateStreak(true);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
   // Get weekday names in order (today at the end)
   const getDayNames = () => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -87,6 +127,7 @@ export function ListeningStreak({
   };
   
   const dayNames = getDayNames();
+  const history = streakHistory || loadedStreakHistory;
   
   return (
     <div className={cn("space-y-6", className)}>
@@ -185,35 +226,45 @@ export function ListeningStreak({
             </p>
           </div>
           
-          <div>
-            <h4 className="font-medium text-white mb-3 flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-indigo-400" />
-              Last 7 Days
-            </h4>
-            
-            <div className="grid grid-cols-7 gap-1">
-              {streakHistory.map((active, index) => (
-                <div key={index} className="flex flex-col items-center gap-1">
-                  <div 
-                    className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center",
-                      active 
-                        ? "bg-gradient-to-br from-amber-500 to-red-500 text-white"
-                        : "bg-gray-800 text-gray-500"
-                    )}
-                  >
-                    {active ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
-                  </div>
-                  <span className="text-xs text-gray-400">{dayNames[index]}</span>
-                </div>
-              ))}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="ml-2 text-sm text-gray-400">Loading streak history...</span>
             </div>
-          </div>
+          ) : history && history.length > 0 ? (
+            <div>
+              <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-indigo-400" />
+                Last 7 Days
+              </h4>
+              
+              <div className="grid grid-cols-7 gap-1">
+                {history.map((active, index) => (
+                  <div key={index} className="flex flex-col items-center gap-1">
+                    <div 
+                      className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center",
+                        active 
+                          ? "bg-gradient-to-br from-amber-500 to-red-500 text-white"
+                          : "bg-gray-800 text-gray-500"
+                      )}
+                    >
+                      {active ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                    </div>
+                    <span className="text-xs text-gray-400">{dayNames[index]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-2">
+              <p className="text-sm text-gray-400">
+                Start listening to build your streak history!
+              </p>
+            </div>
+          )}
         </div>
       </Card>
     </div>
   );
 }
-
-// Import these at the top of the file if not already there
-import { Check, X } from "lucide-react";

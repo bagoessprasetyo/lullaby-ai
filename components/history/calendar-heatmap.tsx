@@ -13,110 +13,12 @@ import {
   Info
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// Types for the heatmap data
-type ActivityDay = {
-  date: Date;
-  count: number;
-};
-
-type CalendarData = {
-  maxCount: number;
-  days: ActivityDay[];
-};
+import { CalendarData } from "@/lib/services/history-service";
 
 interface CalendarHeatmapProps {
+  data: CalendarData;
   timeRange?: "6months" | "year" | "all";
 }
-
-// Function to generate mock data
-const generateMockCalendarData = (timeRange: "6months" | "year" | "all" = "year"): CalendarData => {
-  const today = new Date();
-  const days: ActivityDay[] = [];
-  let maxCount = 0;
-  
-  // Determine number of days based on time range
-  let daysToGenerate = 365; // Default for a year
-  if (timeRange === "6months") {
-    daysToGenerate = 182;
-  } else if (timeRange === "all") {
-    daysToGenerate = 365 * 2; // Mock 2 years for "all"
-  }
-  
-  // Patterns to make the data more realistic
-  const regularPatterns = [
-    { day: 6, probability: 0.8 }, // Saturday - high probability
-    { day: 0, probability: 0.7 }, // Sunday - high probability
-    { day: 1, probability: 0.4 }, // Monday - medium probability
-    { day: 2, probability: 0.4 }, // Tuesday - medium probability
-    { day: 3, probability: 0.4 }, // Wednesday - medium probability
-    { day: 4, probability: 0.5 }, // Thursday - medium probability
-    { day: 5, probability: 0.6 }, // Friday - medium-high probability
-  ];
-  
-  // Special date ranges for increased activity
-  const specialRanges = [
-    { start: new Date(today.getFullYear(), 11, 20), end: new Date(today.getFullYear(), 11, 31), factor: 1.5 }, // Christmas
-    { start: new Date(today.getFullYear(), 6, 1), end: new Date(today.getFullYear(), 7, 31), factor: 1.3 }, // Summer
-    { start: new Date(today.getFullYear(), 2, 15), end: new Date(today.getFullYear(), 3, 15), factor: 1.2 }, // Spring Break
-  ];
-  
-  // Generate data for each day, going backwards from today
-  for (let i = 0; i < daysToGenerate; i++) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    
-    // Base probability derived from day of week
-    const dayOfWeek = date.getDay();
-    const pattern = regularPatterns.find(p => p.day === dayOfWeek);
-    const baseProbability = pattern ? pattern.probability : 0.3;
-    
-    // Check if date falls in special range
-    let activityFactor = 1;
-    for (const range of specialRanges) {
-      if (date >= range.start && date <= range.end) {
-        activityFactor = range.factor;
-        break;
-      }
-    }
-    
-    // Additional random factor for natural variation
-    const randomFactor = 0.7 + (Math.random() * 0.6); // 0.7 to 1.3
-    
-    // Calculate final probability
-    const finalProbability = baseProbability * activityFactor * randomFactor;
-    
-    // Determine activity count (0-4)
-    let count = 0;
-    if (Math.random() < finalProbability) {
-      // If activity happens, determine intensity
-      if (Math.random() < 0.2) {
-        count = 4; // High intensity
-      } else if (Math.random() < 0.4) {
-        count = 3; // Medium-high intensity
-      } else if (Math.random() < 0.6) {
-        count = 2; // Medium intensity
-      } else {
-        count = 1; // Low intensity
-      }
-    }
-    
-    // Add "streak" periods - consecutive days with activity
-    if (i > 0 && days[0]?.count > 0 && Math.random() < 0.7) {
-      count = Math.max(1, Math.floor(days[0].count * (0.8 + Math.random() * 0.4)));
-    }
-    
-    // Update max count if needed
-    maxCount = Math.max(maxCount, count);
-    
-    days.push({ date, count });
-  }
-  
-  // Sort by date from oldest to newest
-  days.sort((a, b) => a.date.getTime() - b.date.getTime());
-  
-  return { maxCount, days };
-};
 
 const getIntensityColor = (count: number, maxCount: number) => {
   if (count === 0) return "bg-gray-800";
@@ -129,16 +31,26 @@ const getIntensityColor = (count: number, maxCount: number) => {
   return "bg-indigo-500";
 };
 
-export function CalendarHeatmap({ timeRange = "year" }: CalendarHeatmapProps) {
-  const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
+export function CalendarHeatmap({ data, timeRange = "year" }: CalendarHeatmapProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [tooltipDay, setTooltipDay] = useState<ActivityDay | null>(null);
+  const [tooltipDay, setTooltipDay] = useState<{date: Date, count: number} | null>(null);
   
-  // Generate mock data
+  // Ensure selected month/year is within the data range when data changes
   useEffect(() => {
-    setCalendarData(generateMockCalendarData(timeRange));
-  }, [timeRange]);
+    if (data && data.days.length > 0) {
+      const oldestDate = data.days[0].date;
+      const newestDate = data.days[data.days.length - 1].date;
+      
+      const currentSelectedDate = new Date(selectedYear, selectedMonth, 1);
+      
+      // If selected date is outside the range, set it to the newest date
+      if (currentSelectedDate < oldestDate || currentSelectedDate > newestDate) {
+        setSelectedMonth(newestDate.getMonth());
+        setSelectedYear(newestDate.getFullYear());
+      }
+    }
+  }, [data]);
   
   // Get month name
   const getMonthName = (monthIndex: number) => {
@@ -177,16 +89,16 @@ export function CalendarHeatmap({ timeRange = "year" }: CalendarHeatmapProps) {
   
   // Get days for the selected month
   const getMonthDays = () => {
-    if (!calendarData) return [];
+    if (!data) return [];
     
-    return calendarData.days.filter(day => {
+    return data.days.filter(day => {
       return day.date.getMonth() === selectedMonth && day.date.getFullYear() === selectedYear;
     });
   };
   
   // Create grid layout for month view
   const generateMonthGrid = () => {
-    if (!calendarData) return [];
+    if (!data) return [];
     
     const monthDays = getMonthDays();
     const firstDay = new Date(selectedYear, selectedMonth, 1);
@@ -199,7 +111,6 @@ export function CalendarHeatmap({ timeRange = "year" }: CalendarHeatmapProps) {
     
     const grid = [];
     let dayCounter = 1;
-    let dayIndex = 0;
     
     for (let row = 0; row < rows; row++) {
       const weekRow = [];
@@ -212,9 +123,7 @@ export function CalendarHeatmap({ timeRange = "year" }: CalendarHeatmapProps) {
           // Find the activity for this day
           const currentDate = new Date(selectedYear, selectedMonth, dayCounter);
           const dayData = monthDays.find(d => 
-            d.date.getDate() === dayCounter &&
-            d.date.getMonth() === selectedMonth &&
-            d.date.getFullYear() === selectedYear
+            d.date.getDate() === dayCounter
           );
           
           weekRow.push({
@@ -238,86 +147,150 @@ export function CalendarHeatmap({ timeRange = "year" }: CalendarHeatmapProps) {
     return monthDays.reduce((sum, day) => sum + day.count, 0);
   };
   
-  // Get streak information
+  // Get streak information from the data
   const getStreakInfo = () => {
-    if (!calendarData) return { current: 0, longest: 0 };
+    if (!data || data.days.length === 0) return { current: 0, longest: 0 };
     
+    // Sort days by date (newest first)
+    const sortedDays = [...data.days].sort((a, b) => 
+      b.date.getTime() - a.date.getTime()
+    );
+    
+    // Check current streak (consecutive days from today)
     let currentStreak = 0;
-    let longestStreak = 0;
-    let tempStreak = 0;
     
-    // Sort by date from newest to oldest
-    const sortedDays = [...calendarData.days].sort((a, b) => b.date.getTime() - a.date.getTime());
-    
-    // Check if today has activity
+    // Start with today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const todayActivity = sortedDays.find(day => 
-      day.date.getTime() === today.getTime()
-    );
+    // Check if today has activity
+    const todayData = sortedDays.find(day => {
+      const dayDate = new Date(day.date);
+      dayDate.setHours(0, 0, 0, 0);
+      return dayDate.getTime() === today.getTime();
+    });
     
-    if (todayActivity && todayActivity.count > 0) {
+    if (todayData && todayData.count > 0) {
       currentStreak = 1;
-      tempStreak = 1;
       
       // Check previous days
-      for (let i = 1; i < sortedDays.length; i++) {
-        const currentDate = sortedDays[i].date;
-        const prevDate = sortedDays[i-1].date;
+      let currentDate = new Date(today);
+      let dayOffset = 1;
+      let streakBroken = false;
+      
+      while (!streakBroken) {
+        // Get previous day
+        currentDate = new Date(today);
+        currentDate.setDate(today.getDate() - dayOffset);
+        currentDate.setHours(0, 0, 0, 0);
         
-        // Check if dates are consecutive
-        const timeDiff = prevDate.getTime() - currentDate.getTime();
-        const dayDiff = timeDiff / (1000 * 3600 * 24);
+        // Check if this day has activity
+        const dayData = sortedDays.find(day => {
+          const dayDate = new Date(day.date);
+          dayDate.setHours(0, 0, 0, 0);
+          return dayDate.getTime() === currentDate.getTime();
+        });
         
-        if (dayDiff === 1 && sortedDays[i].count > 0) {
-          tempStreak++;
-          
-          // Only update current streak if we're dealing with recent days
-          if (i < 30) {
-            currentStreak = tempStreak;
-          }
+        if (dayData && dayData.count > 0) {
+          currentStreak++;
+          dayOffset++;
         } else {
-          longestStreak = Math.max(longestStreak, tempStreak);
-          tempStreak = sortedDays[i].count > 0 ? 1 : 0;
+          streakBroken = true;
         }
       }
-      
-      // Final check for longest streak
-      longestStreak = Math.max(longestStreak, tempStreak);
     } else {
-      // Find most recent streak
-      for (let i = 0; i < sortedDays.length - 1; i++) {
-        if (sortedDays[i].count > 0) {
-          tempStreak++;
+      // Check if yesterday has activity (supporting current streak being from yesterday)
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      
+      const yesterdayData = sortedDays.find(day => {
+        const dayDate = new Date(day.date);
+        dayDate.setHours(0, 0, 0, 0);
+        return dayDate.getTime() === yesterday.getTime();
+      });
+      
+      if (yesterdayData && yesterdayData.count > 0) {
+        currentStreak = 1;
+        
+        // Check days before yesterday
+        let currentDate = new Date(yesterday);
+        let dayOffset = 1;
+        let streakBroken = false;
+        
+        while (!streakBroken) {
+          // Get previous day
+          currentDate = new Date(yesterday);
+          currentDate.setDate(yesterday.getDate() - dayOffset);
+          currentDate.setHours(0, 0, 0, 0);
           
-          // Check if next day is consecutive
-          const currentDate = sortedDays[i].date;
-          const nextDate = sortedDays[i+1].date;
+          // Check if this day has activity
+          const dayData = sortedDays.find(day => {
+            const dayDate = new Date(day.date);
+            dayDate.setHours(0, 0, 0, 0);
+            return dayDate.getTime() === currentDate.getTime();
+          });
           
-          const timeDiff = currentDate.getTime() - nextDate.getTime();
-          const dayDiff = timeDiff / (1000 * 3600 * 24);
-          
-          if (dayDiff !== 1) {
-            longestStreak = Math.max(longestStreak, tempStreak);
-            tempStreak = 0;
+          if (dayData && dayData.count > 0) {
+            currentStreak++;
+            dayOffset++;
+          } else {
+            streakBroken = true;
           }
         }
       }
-      
-      // Final check for longest streak
-      longestStreak = Math.max(longestStreak, tempStreak);
     }
+    
+    // Find longest streak
+    let longestStreak = 0;
+    let currentLongest = 0;
+    let previousDate: Date | null = null;
+    
+    // Sort days by date (oldest first)
+    const chronologicalDays = [...data.days].sort((a, b) => 
+      a.date.getTime() - b.date.getTime()
+    ).filter(day => day.count > 0); // Only days with activity
+    
+    // Iterate through days and find consecutive days
+    chronologicalDays.forEach(day => {
+      const currentDate = new Date(day.date);
+      currentDate.setHours(0, 0, 0, 0);
+      
+      if (previousDate === null) {
+        // First active day
+        currentLongest = 1;
+      } else {
+        // Check if dates are consecutive
+        const prevDate = new Date(previousDate);
+        prevDate.setDate(prevDate.getDate() + 1);
+        prevDate.setHours(0, 0, 0, 0);
+        
+        if (currentDate.getTime() === prevDate.getTime()) {
+          // Consecutive day
+          currentLongest++;
+        } else {
+          // Break in streak
+          longestStreak = Math.max(longestStreak, currentLongest);
+          currentLongest = 1;
+        }
+      }
+      
+      previousDate = currentDate;
+    });
+    
+    // Check if the last streak is the longest
+    longestStreak = Math.max(longestStreak, currentLongest);
     
     return { current: currentStreak, longest: longestStreak };
   };
   
-  const { current: currentStreak, longest: longestStreak } = getStreakInfo();
   const monthGrid = generateMonthGrid();
   const totalMonthActivity = getMonthActivity();
+  const { current: currentStreak, longest: longestStreak } = getStreakInfo();
   
   const today = new Date();
   const isCurrentMonth = selectedMonth === today.getMonth() && selectedYear === today.getFullYear();
+  const canGoForward = !isCurrentMonth;
   
   return (
     <div className="space-y-6">
@@ -345,14 +318,14 @@ export function CalendarHeatmap({ timeRange = "year" }: CalendarHeatmapProps) {
               size="sm" 
               className="h-8 w-8 p-0 border-gray-700"
               onClick={nextMonth}
-              disabled={isCurrentMonth}
+              disabled={!canGoForward}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          {calendarData ? (
+          {data ? (
             <div className="space-y-6">
               {/* Calendar grid */}
               <div className="select-none">
@@ -387,7 +360,7 @@ export function CalendarHeatmap({ timeRange = "year" }: CalendarHeatmapProps) {
                             <div
                               className={cn(
                                 "w-7 h-7 rounded-md flex items-center justify-center",
-                                getIntensityColor(day.count, calendarData.maxCount)
+                                getIntensityColor(day.count, data.maxCount)
                               )}
                             >
                               <span className={cn(

@@ -22,8 +22,10 @@ import {
   Clock,
   CalendarDays,
 } from "lucide-react";
-import { Story } from "@/app/dashboard/library/page";
+
 import { formatDuration } from "@/lib/format-duration";
+import { ReactElement, JSXElementConstructor, ReactNode, ReactPortal, Key } from "react";
+import { Story } from "@/types/story";
 
 interface StoryListItemProps {
   story: Story;
@@ -102,7 +104,7 @@ export function StoryListItem({ story, onToggleFavorite, onDelete }: StoryListIt
         </div>
         
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {story.tags.map((tag, index) => (
+          {story.tags.map((tag: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined, index: Key | null | undefined) => (
             <Badge 
               key={index} 
               variant="outline" 

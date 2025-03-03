@@ -8,7 +8,10 @@ import {
   getUserStreak,
   getListeningPatterns,
   PlayHistory,
-  ListeningStats
+  ListeningStats,
+  PlayHistoryEntry,
+  getCalendarData,
+  CalendarData
 } from "@/lib/services/history-service";
 
 type StoryPlay = {
@@ -27,9 +30,10 @@ type TimeframeOption = '7days' | '30days' | '90days' | 'all';
 export function useHistory() {
   const { data: session, status } = useSession();
   const [isLoading, setIsLoading] = useState(true);
-  const [plays, setPlays] = useState<StoryPlay[]>([]);
+  const [plays, setPlays] = useState<PlayHistoryEntry[]>([]);
   const [stats, setStats] = useState<ListeningStats | null>(null);
   const [calendarData, setCalendarData] = useState<{date: string, count: number, duration: number}[]>([]);
+  const [calendarHeatmapData, setCalendarHeatmapData] = useState<CalendarData | null>(null);
   const [streak, setStreak] = useState({
     currentStreak: 0,
     longestStreak: 0,
@@ -37,8 +41,8 @@ export function useHistory() {
     streakHistory: [] as boolean[]
   });
   const [listeningPatterns, setListeningPatterns] = useState({
-    hourly: [] as {hour: number, count: number}[],
-    weekly: [] as {day: number, name: string, count: number}[]
+    hourlyDistribution: [] as {hour: number, count: number}[],
+    weekdayDistribution: [] as {day: string, count: number}[]
   });
   const [totalCount, setTotalCount] = useState(0);
   const [filterPeriod, setFilterPeriod] = useState<TimeframeOption>('30days');
@@ -56,31 +60,11 @@ export function useHistory() {
     try {
       // Get play history
       const { history, count } = await getPlayHistory(session.user.id, {
-        timeframe: filterPeriod,
+        timeRange: filterPeriod, // Updated from timeframe to timeRange
         searchQuery: searchQuery,
       });
       
-      // Transform to UI format
-      const formattedPlays: StoryPlay[] = history.map(play => {
-        // Extract image URL from story
-        const images = play.story?.images || [];
-        const imagePath = images.length > 0 
-          ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${images[0].storage_path}`
-          : "https://via.placeholder.com/300x300?text=No+Image";
-        
-        return {
-          id: play.id,
-          storyId: play.story_id,
-          storyTitle: play.story?.title || "Unknown Story",
-          coverImage: imagePath,
-          playedAt: new Date(play.played_at),
-          duration: play.story?.duration || 0,
-          completed: play.completed,
-          progress: play.progress_percentage
-        };
-      });
-      
-      setPlays(formattedPlays);
+      setPlays(history);
       setTotalCount(count);
       
       // Get listening stats if viewing stats tab
@@ -89,16 +73,23 @@ export function useHistory() {
         setStats(stats);
         
         // Get listening patterns
-        const patterns = await getListeningPatterns(session.user.id);
+        const patterns = await getListeningPatterns(session.user.id, filterPeriod);
         setListeningPatterns(patterns);
       }
       
       // Get calendar data if viewing calendar tab
       if (currentTab === "calendar") {
+        // Use getPlayHistoryByDay for the old calendar format
         const calTimeframe = filterPeriod === '7days' ? '30days' : 
                             filterPeriod === 'all' ? '365days' : filterPeriod;
-        const calendarData = await getPlayHistoryByDay(session.user.id, calTimeframe as any);
-        setCalendarData(calendarData);
+        const oldCalendarData = await getPlayHistoryByDay(session.user.id, calTimeframe as any);
+        setCalendarData(oldCalendarData);
+        
+        // Use new getCalendarData for the heatmap view
+        const heatmapTimeRange = filterPeriod === '7days' || filterPeriod === '30days' ? '6months' :
+                                filterPeriod === '90days' ? 'year' : 'all';
+        const heatmapData = await getCalendarData(session.user.id, heatmapTimeRange as '6months' | 'year' | 'all');
+        setCalendarHeatmapData(heatmapData);
       }
       
       // Get streak data in any case (shown on all tabs)
@@ -135,6 +126,7 @@ export function useHistory() {
     plays: getFilteredPlays(),
     stats,
     calendarData,
+    calendarHeatmapData,
     streak,
     listeningPatterns,
     totalCount,
