@@ -9,17 +9,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, Trash2, Check } from "lucide-react";
+import { updateProfileSettingsAction } from "@/app/actions/settings-actions";
 
 interface ProfileSettingsProps {
   user: any;
+  profile: any;
 }
 
-export function ProfileSettings({ user }: ProfileSettingsProps) {
-  const [name, setName] = useState(user?.name || "");
-  const [bio, setBio] = useState("");
+export function ProfileSettings({ user, profile }: ProfileSettingsProps) {
+  const [name, setName] = useState(profile?.name || user?.name || "");
+  const [bio, setBio] = useState(profile?.bio || "");
   const [isSaving, setIsSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(user?.image || null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(user?.image || profile?.avatar_url || null);
   const [successMessage, setSuccessMessage] = useState("");
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,20 +48,31 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
   const handleSaveProfile = async () => {
     setIsSaving(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      // Call server action to update profile
+      await updateProfileSettingsAction({
+        name,
+        bio
+      });
+      
+      // Show success message
       setSuccessMessage("Profile updated successfully!");
       
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage("");
       }, 3000);
-    }, 1500);
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      // Here you could add error handling
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Rest of component remains the same */}
       <div>
         <h2 className="text-2xl font-bold text-white mb-1">Profile</h2>
         <p className="text-gray-400">

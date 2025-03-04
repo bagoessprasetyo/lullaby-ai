@@ -14,6 +14,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
+import { updateEmailAction } from "@/app/actions/settings-actions";
 
 interface AccountSettingsProps {
   user: any;
@@ -29,16 +30,23 @@ export function AccountSettings({ user }: AccountSettingsProps) {
   const handleSaveEmail = async () => {
     setIsSaving(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSaving(false);
-      setSuccessMessage("Verification email sent successfully!");
+    try {
+      // Call server action to update email
+      const result = await updateEmailAction(newEmail);
+      
+      // Show success message
+      setSuccessMessage(result.message || "Verification email sent successfully!");
       
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage("");
       }, 3000);
-    }, 1500);
+    } catch (error) {
+      console.error("Error updating email:", error);
+      // Handle errors here
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancelEmailChange = () => {

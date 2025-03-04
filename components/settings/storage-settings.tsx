@@ -21,6 +21,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
+import { clearStorageCacheAction } from "@/app/actions/settings-actions";
 
 export function StorageSettings() {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -41,22 +42,29 @@ export function StorageSettings() {
   const handleDeleteCache = async () => {
     setIsDeleting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsDeleting(false);
+    try {
+      // Call server action to clear cache
+      await clearStorageCacheAction();
+      
+      // Show success message
       setSuccessMessage("Cache cleared successfully!");
       
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage("");
       }, 3000);
-    }, 1500);
+    } catch (error) {
+      console.error("Error clearing cache:", error);
+      // Handle errors here
+    } finally {
+      setIsDeleting(false);
+    }
   };
   
   const handlePurgeData = async () => {
     setIsPurging(true);
     
-    // Simulate API call
+    // Simulate API call - in real implementation, would call a server action
     setTimeout(() => {
       setIsPurging(false);
       setSuccessMessage("All data purged successfully!");
@@ -68,6 +76,7 @@ export function StorageSettings() {
     }, 2000);
   };
 
+  // Rest of component remains the same
   return (
     <div className="space-y-6">
       <div>

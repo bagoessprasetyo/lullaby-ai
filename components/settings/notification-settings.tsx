@@ -9,31 +9,50 @@ import { Check, Bell, MessageCircle, Mail, Gift, Info } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { updateNotificationSettingsAction } from "@/app/actions/settings-actions";
 
-export function NotificationSettings() {
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [newStoryNotifications, setNewStoryNotifications] = useState(true);
-  const [promotionalNotifications, setPromotionalNotifications] = useState(false);
-  const [reminderFrequency, setReminderFrequency] = useState("weekly");
+interface NotificationSettingsProps {
+  preferences: any;
+}
+
+export function NotificationSettings({ preferences }: NotificationSettingsProps) {
+  const [emailNotifications, setEmailNotifications] = useState(preferences?.email_notifications !== false);
+  const [pushNotifications, setPushNotifications] = useState(preferences?.push_notifications !== false);
+  const [newStoryNotifications, setNewStoryNotifications] = useState(preferences?.story_reminders !== false);
+  const [promotionalNotifications, setPromotionalNotifications] = useState(preferences?.promotional_content || false);
+  const [reminderFrequency, setReminderFrequency] = useState(preferences?.reminder_frequency || "weekly");
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
   const handleSaveNotifications = async () => {
     setIsSaving(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      // Call server action to update notification settings
+      await updateNotificationSettingsAction({
+        emailNotifications,
+        pushNotifications,
+        newStoryNotifications,
+        promotionalNotifications,
+        reminderFrequency
+      });
+      
+      // Show success message
       setSuccessMessage("Notification preferences saved successfully!");
       
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage("");
       }, 3000);
-    }, 1500);
+    } catch (error) {
+      console.error("Error saving notification settings:", error);
+      // Handle errors here
+    } finally {
+      setIsSaving(false);
+    }
   };
 
+  // Rest of component remains the same
   return (
     <div className="space-y-6">
       <div>
@@ -141,7 +160,7 @@ export function NotificationSettings() {
               <div className="space-y-3 pt-4 border-t border-gray-800">
                 <Label>Reminder Frequency</Label>
                 <RadioGroup 
-                  defaultValue={reminderFrequency} 
+                  value={reminderFrequency} 
                   onValueChange={setReminderFrequency}
                 >
                   <div className="flex items-center space-x-2">

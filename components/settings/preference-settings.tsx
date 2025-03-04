@@ -10,34 +10,54 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { updatePreferencesAction } from "@/app/actions/settings-actions";
 
-export function PreferenceSettings() {
-  const [theme, setTheme] = useState("dark");
-  const [language, setLanguage] = useState("english");
-  const [voiceGender, setVoiceGender] = useState("female");
-  const [voiceSpeed, setVoiceSpeed] = useState("normal");
-  const [musicEnabled, setMusicEnabled] = useState(true);
-  const [visualEffects, setVisualEffects] = useState(true);
+interface PreferenceSettingsProps {
+  preferences: any;
+}
+
+export function PreferenceSettings({ preferences }: PreferenceSettingsProps) {
+  const [theme, setTheme] = useState(preferences?.theme_mode || "dark");
+  const [language, setLanguage] = useState(preferences?.default_language || "english");
+  const [voiceGender, setVoiceGender] = useState(preferences?.voice_gender || "female");
+  const [voiceSpeed, setVoiceSpeed] = useState(preferences?.voice_speed || "normal");
+  const [musicEnabled, setMusicEnabled] = useState(preferences?.background_music_enabled !== false);
+  const [visualEffects, setVisualEffects] = useState(preferences?.visual_effects_enabled !== false);
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
   const handleSavePreferences = async () => {
     setIsSaving(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      // Call server action to update preferences
+      await updatePreferencesAction({
+        theme,
+        language,
+        voiceGender,
+        voiceSpeed,
+        musicEnabled,
+        visualEffects
+      });
+      
+      // Show success message
       setSuccessMessage("Preferences saved successfully!");
       
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage("");
       }, 3000);
-    }, 1500);
+    } catch (error) {
+      console.error("Error saving preferences:", error);
+      // Handle errors here
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Component content remains the same */}
       <div>
         <h2 className="text-2xl font-bold text-white mb-1">Preferences</h2>
         <p className="text-gray-400">
@@ -61,7 +81,7 @@ export function PreferenceSettings() {
           <CardContent>
             <div className="space-y-4">
               <RadioGroup 
-                defaultValue={theme} 
+                value={theme} 
                 onValueChange={setTheme}
                 className="grid grid-cols-3 gap-4"
               >
@@ -160,7 +180,7 @@ export function PreferenceSettings() {
               <div className="space-y-2">
                 <Label>Voice Type</Label>
                 <RadioGroup 
-                  defaultValue={voiceGender} 
+                  value={voiceGender} 
                   onValueChange={setVoiceGender}
                   className="grid grid-cols-2 gap-4"
                 >

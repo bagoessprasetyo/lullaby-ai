@@ -1,5 +1,5 @@
 export type SubscriptionTier = 'free' | 'premium' | 'family';
-export type SubscriptionStatus = 'active' | 'inactive' | 'cancelled';
+export type SubscriptionStatus = 'active' | 'trialing' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'unpaid';
 export type BillingPeriod = 'monthly' | 'annual';
 
 export interface SubscriptionPlan {
@@ -9,6 +9,8 @@ export interface SubscriptionPlan {
   price: number;
   period: BillingPeriod;
   features: string[];
+  stripeProductId?: string; // Add this for Stripe integration
+  stripePriceId?: string;   // Add this for Stripe integration
 }
 
 export interface SubscriptionState {
@@ -29,4 +31,12 @@ export interface SubscriptionFeatures {
     unlimited_storage: boolean;
     max_images: number;
   };
+}
+
+export interface StripeCustomer {
+  id: string;
+  email: string;
+  name?: string;
+  subscriptionId?: string;
+  priceId?: string;
 }

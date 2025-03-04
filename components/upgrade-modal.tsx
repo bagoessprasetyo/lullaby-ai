@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { createCheckoutAction } from "@/app/actions/subscription-actions";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -82,16 +83,25 @@ export function UpgradeModal({
   const handleUpgrade = async () => {
     setIsProcessing(true);
     
-    // Here you would implement actual payment processing logic
-    // This could be Stripe, PayPal, etc.
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Call the LemonSqueezy checkout action
+      const billingPeriod = isAnnual ? 'annual' : 'monthly';
+      const result = await createCheckoutAction(selectedPlan, billingPeriod);
+      
+      if (result.success && result.url) {
+        // Redirect to LemonSqueezy checkout
+        window.location.href = result.url;
+      } else {
+        // Handle error
+        console.error('Failed to create checkout session');
+        alert('There was an error creating your checkout session. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      alert('There was an error processing your upgrade. Please try again.');
+    } finally {
       setIsProcessing(false);
-      // Show success message or redirect
-      alert(`You've been upgraded to ${selectedPlan}!`);
-      onOpenChange(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -102,7 +112,6 @@ export function UpgradeModal({
             <Sparkles className="h-5 w-5 text-indigo-400" />
             Upgrade Your Experience
           </DialogTitle>
-          {/* Fix: Add asChild and wrap content in div */}
           <DialogDescription asChild>
             <div className="mt-2 bg-indigo-900/30 border border-indigo-800 rounded p-2 text-indigo-300">
               {highlightedFeature}
@@ -156,10 +165,10 @@ export function UpgradeModal({
                 <div className="mb-4">
                   <div className="flex items-baseline">
                     <span className="text-3xl font-bold text-white">
-                      ${plan.price.toFixed(2)} {/* Add toFixed(2) here */}
+                      ${plan.price.toFixed(2)}
                     </span>
                     <span className="text-gray-400 ml-2">
-                      /{state.billingPeriod === 'annual' ? 'year' : 'month'} {/* Fix period display */}
+                      /{isAnnual ? 'year' : 'month'}
                     </span>
                   </div>
                 </div>
