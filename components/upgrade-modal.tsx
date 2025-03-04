@@ -73,7 +73,9 @@ export function UpgradeModal({
   const plans = useMemo(() => {
     return defaultPlans.map(plan => ({
       ...plan,
-      price: state.billingPeriod === 'annual' ? plan.price * 0.8 : plan.price
+      price: state.billingPeriod === 'annual' ? 
+        Math.round(plan.price * 0.8 * 100) / 100 : // Round to 2 decimal places
+        plan.price
     }));
   }, [state.billingPeriod]);
 
@@ -100,13 +102,11 @@ export function UpgradeModal({
             <Sparkles className="h-5 w-5 text-indigo-400" />
             Upgrade Your Experience
           </DialogTitle>
-          <DialogDescription>
-            Choose a plan to unlock premium features and enhance your storytelling.
-            {highlightedFeature && (
-              <div className="mt-2 bg-indigo-900/30 border border-indigo-800 rounded p-2 text-indigo-300">
-                <strong>Unlock {highlightedFeature}</strong> and all other premium features.
-              </div>
-            )}
+          {/* Fix: Add asChild and wrap content in div */}
+          <DialogDescription asChild>
+            <div className="mt-2 bg-indigo-900/30 border border-indigo-800 rounded p-2 text-indigo-300">
+              {highlightedFeature}
+            </div>
           </DialogDescription>
         </DialogHeader>
         
@@ -155,8 +155,12 @@ export function UpgradeModal({
                 
                 <div className="mb-4">
                   <div className="flex items-baseline">
-                    <span className="text-3xl font-bold text-white">${plan.price}</span>
-                    <span className="text-gray-400 ml-2">/{plan.period}</span>
+                    <span className="text-3xl font-bold text-white">
+                      ${plan.price.toFixed(2)} {/* Add toFixed(2) here */}
+                    </span>
+                    <span className="text-gray-400 ml-2">
+                      /{state.billingPeriod === 'annual' ? 'year' : 'month'} {/* Fix period display */}
+                    </span>
                   </div>
                 </div>
                 

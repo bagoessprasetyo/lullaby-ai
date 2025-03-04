@@ -1,7 +1,7 @@
 // app/dashboard/create/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
@@ -30,7 +30,7 @@ import { LanguageStep } from "@/components/story-creation/language-step";
 import { VoiceSelectionStep } from "@/components/story-creation/voice-selection-step";
 import { ReviewStep } from "@/components/story-creation/review-step";
 import { AsyncStoryGenerator } from "@/components/story-creation/async-generator";
-import { createApiServices } from "@/lib/api/apiService";
+import { useSubscription } from "@/hooks/useSubscription";
 
 // Types for our form data
 export type StoryFormData = {
@@ -75,27 +75,74 @@ export default function StoryCreationPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<StoryFormData>(initialFormData);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [isSubscriber, setIsSubscriber] = useState(false); // In reality, fetch this from user data
-  const [subscriptionFeatures, setSubscriptionFeatures] = useState<any>(null);
   
-  const apiServices = createApiServices(session);
-
-  useEffect(() => {
-    // Check user subscription status
-    if (session?.user?.id) {
-      apiServices.user.getSubscriptionFeatures()
-        .then(features => {
-          if (features.success) {
-            setSubscriptionFeatures(features);
-            setIsSubscriber(features.subscription_tier !== 'free');
-          }
-        })
-        .catch(error => {
-          console.error("Error fetching subscription features:", error);
-        });
-    }
-  }, [session, apiServices.user]);
-
+  // Use our subscription hook that uses server action
+  const { features, isSubscriber, isLoading: subscriptionLoading } = useSubscription();
+  console.log('freature', features);
+  // const validateStep = () => {
+  //   const newErrors: { [key: string]: string } = {};
+    
+  //   switch (currentStep) {
+  //     case 0: // Upload Photos
+  //       if (formData.images.length === 0) {
+  //         newErrors.images = "Please upload at least one image";
+  //       } else if (formData.images.length > 5) {
+  //         newErrors.images = "Maximum 5 images allowed";
+  //       }
+  //       break;
+        
+  //     case 1: // Theme Selection
+  //       if (!formData.theme) {
+  //         newErrors.theme = "Please select a theme for your story";
+  //       }
+        
+  //       // Check if premium features are restricted
+  //       if (features && 
+  //           (formData.theme === "educational" || formData.theme === "customized") && 
+  //           !features.features.educational_themes) {
+  //         newErrors.theme = "Educational and customized themes require a premium subscription";
+  //       }
+  //       break;
+        
+  //     case 2: // Characters
+  //       const emptyCharacters = formData.characters.filter(
+  //         (character) => character.name.trim() === ""
+  //       );
+  //       if (emptyCharacters.length > 0) {
+  //         newErrors.characters = "Please fill in all character names";
+  //       }
+  //       break;
+        
+  //     case 3: // Duration
+  //       if (features && 
+  //           formData.duration === "long" && 
+  //           !features.features.long_stories) {
+  //         newErrors.duration = "Long stories are available for subscribers only";
+  //       }
+  //       break;
+        
+  //     case 4: // Background Music
+  //       if (features && 
+  //           formData.backgroundMusic && 
+  //           !features.features.background_music) {
+  //         newErrors.backgroundMusic = "Background music requires a premium subscription";
+  //       }
+  //       // break;
+        
+  //     case 6: // Voice
+  //       // Check if custom voices are allowed
+  //       if (features && 
+  //           formData.voice && 
+  //           formData.voice.startsWith("custom-") && 
+  //           !features.features.custom_voices) {
+  //         newErrors.voice = "Custom voices require a premium subscription";
+  //       }
+  //       break;
+  //   }
+    
+  //   setErrors(newErrors);
+  //   return Object.keys(newErrors).length === 0;
+  // };
   const validateStep = () => {
     const newErrors: { [key: string]: string } = {};
     
@@ -114,9 +161,9 @@ export default function StoryCreationPage() {
         }
         
         // Check if premium features are restricted
-        if (subscriptionFeatures && 
+        if (features && 
             (formData.theme === "educational" || formData.theme === "customized") && 
-            !subscriptionFeatures.features.educational_themes) {
+            !features.features.educational_themes) {
           newErrors.theme = "Educational and customized themes require a premium subscription";
         }
         break;
@@ -131,27 +178,31 @@ export default function StoryCreationPage() {
         break;
         
       case 3: // Duration
-        if (subscriptionFeatures && 
+        if (features && 
             formData.duration === "long" && 
-            !subscriptionFeatures.features.long_stories) {
+            !features.features.long_stories) {
           newErrors.duration = "Long stories are available for subscribers only";
         }
         break;
         
       case 4: // Background Music
-        if (subscriptionFeatures && 
-            formData.backgroundMusic && 
-            !subscriptionFeatures.features.background_music) {
-          newErrors.backgroundMusic = "Background music requires a premium subscription";
-        }
+        // if (features && 
+        //     formData.backgroundMusic && 
+        //     !features.features.background_music) {
+        //   newErrors.backgroundMusic = "Background music requires a premium subscription";
+        // }
+        // break; // THIS WAS COMMENTED OUT - UNCOMMENT IT
+        
+      case 5: // Language
+        // Add any language validation if needed
         break;
         
       case 6: // Voice
         // Check if custom voices are allowed
-        if (subscriptionFeatures && 
+        if (features && 
             formData.voice && 
             formData.voice.startsWith("custom-") && 
-            !subscriptionFeatures.features.custom_voices) {
+            !features.features.custom_voices) {
           newErrors.voice = "Custom voices require a premium subscription";
         }
         break;
@@ -160,11 +211,21 @@ export default function StoryCreationPage() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
   const handleNext = () => {
+    logStepChange('forward');
     if (validateStep()) {
-      setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+      setCurrentStep((prev) => {
+        const newStep = Math.min(prev + 1, steps.length - 1);
+        console.log(`Moving to step ${newStep}`);
+        return newStep;
+      });
     }
+  };
+
+  const logStepChange = (direction: string) => {
+    console.log(`Attempting to move ${direction} from step ${currentStep}`);
+    console.log(`Validation result:`, validateStep());
+    console.log(`Errors:`, errors);
   };
 
   const handlePrevious = () => {
@@ -189,7 +250,8 @@ export default function StoryCreationPage() {
     updateFormData("isGenerating", false);
   };
 
-  if (status === "loading") {
+  // Show loading state while session or subscription data is loading
+  if (status === "loading" || subscriptionLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">

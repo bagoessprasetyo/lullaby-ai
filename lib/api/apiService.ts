@@ -61,6 +61,7 @@ class ApiClient {
  * Story API Service
  */
 export class StoryService extends ApiClient {
+  private pendingRequests = new Map<string, AbortController>();
   /**
    * Generate a story based on form data
    */
@@ -102,8 +103,19 @@ export class StoryService extends ApiClient {
   /**
    * Generate a story asynchronously with webhook notification
    */
-  async generateStoryAsync(formData: StoryFormData, callbackUrl?: string): Promise<any> {
+  async generateStoryAsync(formData: StoryFormData, callbackUrl?: string) {
+    const userId = this.token || 'anonymous';
+
+    if (this.pendingRequests.has(userId)) {
+      this.pendingRequests.get(userId)?.abort();
+    }
+
+    const controller = new AbortController();
+    this.pendingRequests.set(userId, controller);
+
     try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       // Convert images to base64
       const imagePromises = formData.images.map(file => this.fileToBase64(file));
       const images = await Promise.all(imagePromises);
@@ -125,15 +137,15 @@ export class StoryService extends ApiClient {
         voice: formData.voice,
         callback_url: callbackUrl,
       };
-
+      console.log('payload ', JSON.stringify(payload))
       // Make API request
       return await this.request('/api/stories/generate/webhook', {
         method: 'POST',
         body: JSON.stringify(payload),
+        signal: controller.signal
       });
-    } catch (error) {
-      console.error('Error starting async story generation:', error);
-      throw error;
+    } finally {
+      this.pendingRequests.delete(userId);
     }
   }
 
@@ -271,6 +283,7 @@ export class UserService extends ApiClient {
  * Create API services with the current session
  */
 export function createApiServices(session: Session | null) {
+    
   return {
     story: new StoryService(session),
     user: new UserService(session),

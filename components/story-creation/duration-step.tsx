@@ -31,8 +31,12 @@ export function DurationStep({
   const handleDurationChange = (value: "short" | "medium" | "long") => {
     updateFormData("duration", value);
   };
-
-  const { openModal } = useUpgradeModal();
+  
+  // Fix: Only call useUpgradeModal once
+  const { openModal, isOpen } = useUpgradeModal();
+  
+  // You can log the state if needed
+  console.log("Modal state:", { isOpen });
   
   return (
     <div className="space-y-6">

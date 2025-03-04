@@ -1,7 +1,7 @@
 // components/story-creation/async-generator.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,9 @@ import { StoryFormData } from "@/app/dashboard/create/page";
 import { createApiServices } from "@/lib/api/apiService";
 import { useStoryGenerationStatus } from "@/hooks/useWebSocket";
 import { useToast } from "@/components/ui/use-toast";
+import { useUpgradeModal } from "@/hooks/useUpgradeModal";
+import { rateLimiter } from "@/lib/rate-limiter";
+import { GenerateStoryResponse } from "@/lib/api/storyGeneration";
 
 interface AsyncGeneratorProps {
   formData: StoryFormData;
@@ -32,7 +35,7 @@ export function AsyncStoryGenerator({ formData, onReset }: AsyncGeneratorProps) 
   const { data: session } = useSession();
   const router = useRouter();
   const { toast } = useToast();
-  
+  const { openModal } = useUpgradeModal();
   // State for generation process
   const [requestId, setRequestId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -51,9 +54,23 @@ export function AsyncStoryGenerator({ formData, onReset }: AsyncGeneratorProps) 
   const apiServices = createApiServices(session);
   
   // Start generation when component mounts
-  useEffect(() => {
-    startGeneration();
-  }, []);
+//   useEffect(() => {
+//     startGeneration();
+//   }, []);
+    useEffect(() => {
+        let isMounted = true;
+        const runGeneration = async () => {
+        if (isMounted) {
+            await startGeneration();
+        }
+        };
+        
+        runGeneration();
+        
+        return () => {
+        isMounted = false;
+        };
+    }, []); // Remove dependency on startGeneration to avoid circular reference
   
   // Watch for result changes
   useEffect(() => {
@@ -82,18 +99,27 @@ export function AsyncStoryGenerator({ formData, onReset }: AsyncGeneratorProps) 
   }, [isConnected, requestId, toast]);
   
   // Start story generation
-  const startGeneration = async () => {
+  // const { openModal } = useUpgradeModal();
+
+  // Modified startGeneration function
+  const startGeneration = useCallback(async () => {
     try {
       setIsStarting(true);
       setRequestId(null);
       setGenerationError(null);
-      
+
+      // Check rate limit
+      const { success } = await rateLimiter.limit(session?.user?.id || 'anonymous');
+      if (!success) {
+        throw new Error('You can generate up to 5 stories per minute. Please wait before creating more.');
+      }
+
       // Get current URL for callback
       const origin = window.location.origin;
       const callbackUrl = `${origin}/api/webhooks/story-completed`;
       
       // Call API to start async generation
-      const response = await apiServices.story.generateStoryAsync(formData, callbackUrl);
+      const response = await apiServices.story.generateStoryAsync(formData, callbackUrl) as GenerateStoryResponse & { requestId?: string };
       
       if (response.success && response.requestId) {
         setRequestId(response.requestId);
@@ -102,11 +128,18 @@ export function AsyncStoryGenerator({ formData, onReset }: AsyncGeneratorProps) 
       }
     } catch (error) {
       console.error("Error starting generation:", error);
-      setGenerationError(error instanceof Error ? error.message : "Failed to start story generation");
+      const message = error instanceof Error ? error.message : "Failed to start story generation";
+      
+      if (message.includes('You can generate up to 5 stories per minute')) {
+        setGenerationError(message);
+        openModal('story-generation');
+      } else {
+        setGenerationError(message);
+      }
     } finally {
       setIsStarting(false);
     }
-  };
+  }, [session?.user?.id, apiServices.story, formData, openModal]);
   
   // Get current step description
   const getStepDescription = () => {
