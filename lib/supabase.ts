@@ -2,27 +2,73 @@
 import { createClient as createClientBase } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
-// Check if environment variables are defined
+// Get Supabase URL and anon key from environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// For client-side with limited permissions
-export const supabase = createClientBase(
-  supabaseUrl || '', 
-  supabaseAnonKey || ''
-);
+// Types for your database
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          name: string | null;
+          email: string | null;
+          avatar_url: string | null;
+          oauth_id: string | null;
+          created_at: string;
+          last_login_at: string | null;
+          subscription_tier: string | null;
+          story_credits: number | null;
+          voice_credits: number | null;
+          // Add other fields as needed
+        };
+        Insert: {
+          id?: string;
+          name?: string | null;
+          email?: string | null;
+          avatar_url?: string | null;
+          oauth_id?: string | null;
+          created_at?: string;
+          last_login_at?: string | null;
+          subscription_tier?: string | null;
+          story_credits?: number | null;
+          voice_credits?: number | null;
+          // Add other fields as needed
+        };
+        Update: {
+          id?: string;
+          name?: string | null;
+          email?: string | null;
+          avatar_url?: string | null;
+          oauth_id?: string | null;
+          created_at?: string;
+          last_login_at?: string | null;
+          subscription_tier?: string | null;
+          story_credits?: number | null;
+          voice_credits?: number | null;
+          // Add other fields as needed
+        };
+      };
+      // Add other tables as needed
+    };
+    // Add other schema elements as needed
+  };
+};
 
-// For server operations requiring elevated privileges (server-side only)
-export const supabaseAdmin = typeof window === 'undefined' && supabaseServiceKey
-  ? createClientBase(supabaseUrl || '', supabaseServiceKey)
-  : null;
-
-// Helper function to create a client with cookies for server components
+/**
+ * Create a Supabase client configured for use with cookies (server components)
+ */
 export function createClient(cookieStore: ReturnType<typeof cookies>) {
-  return createClientBase(
-    supabaseUrl || '',
-    supabaseAnonKey || '',
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+  
+  return createClientBase<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
     {
       auth: {
         persistSession: false,
@@ -52,22 +98,45 @@ export function createClient(cookieStore: ReturnType<typeof cookies>) {
   );
 }
 
-// Helper function to get admin client on server side only
-export function getAdminClient() {
-  if (typeof window !== 'undefined') {
-    throw new Error('Admin client can only be used on the server');
+/**
+ * Create a client-side Supabase client
+ */
+export function createBrowserClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables');
   }
   
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Missing Supabase environment variables for admin client');
-  }
-  
-  return createClientBase(supabaseUrl, supabaseServiceKey);
+  return createClientBase<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      auth: {
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    }
+  );
 }
 
-// Log initialization status but not the actual keys
-console.log('Supabase clients initialized:', {
-  hasUrl: !!supabaseUrl,
-  hasAnonKey: !!supabaseAnonKey,
-  hasServiceKey: typeof window === 'undefined' && !!supabaseServiceKey
-});
+/**
+ * Create a Supabase admin client with service role for server-side operations
+ */
+export function getAdminClient() {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing Supabase admin environment variables');
+  }
+  
+  return createClientBase<Database>(
+    supabaseUrl,
+    supabaseServiceKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
+}
+
+// Export a browser client as the default supabase instance
+export const supabase = createBrowserClient();

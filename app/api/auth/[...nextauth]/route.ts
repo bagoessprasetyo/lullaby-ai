@@ -2,7 +2,10 @@
 import NextAuth from "next-auth";
 import { authOptions } from "@/auth.config";
 
-// Create authentication options
+// Handle the edge case if Supabase is not configured
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  console.warn("Supabase credentials are missing. Authentication will work but user profiles won't be synced.");
+}
 
 // Create the handler
 const handler = NextAuth(authOptions);
