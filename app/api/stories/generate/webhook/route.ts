@@ -1,5 +1,6 @@
+import { auth } from '@/auth';
 import { rateLimiter } from '@/lib/rate-limiter';
-import { auth } from '@/lib/auth';
+// import { auth } from '@/lib/auth';
 
 export async function POST(req: Request) {
   const session = await auth();
