@@ -1,33 +1,12 @@
-import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
+// auth.ts
+import NextAuth from "next-auth"
+import { authOptions } from "./auth.config"
 
-export const { auth, signIn, signOut } = NextAuth({
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    }),
-  ],
-  pages: {
-    signIn: "/",  // We're using modal for sign in, so redirect to home
-  },
-  callbacks: {
-    async session({ session, token }) {
-      if (token && session.user) {
-        session.user = {
-          name: session.user.name,
-          email: session.user.email,
-          image: session.user.image,
-          id: token.sub || ""
-        } as any; // Type assertion to bypass TypeScript error
-      }
-      return session;
-    },
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-      }
-      return token;
-    }
-  },
-});
+// Export the NextAuth handler with built-in async handling
+export const { auth, signIn, signOut } = NextAuth(authOptions)
+
+// Create a separate function to get the session
+export async function getSession() {
+  const session = await auth()
+  return session
+}

@@ -1,9 +1,10 @@
 // app/dashboard/page.tsx
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/auth.config";;
 import { redirect } from "next/navigation";
 import { getRecentStories, getStoryCount } from "@/lib/services/story-service";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
+// import { getSession } from "@/auth";
 
 export default async function DashboardPage() {
   // Get server-side session - make sure getServerSession awaits cookies/headers internally

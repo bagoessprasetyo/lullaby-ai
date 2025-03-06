@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState } from "react";
@@ -75,7 +76,7 @@ export function StoryGrid({ stories }: StoryGridProps) {
         <StoryCard
           key={story.id}
           story={story}
-          onToggleFavorite={() => handleToggleFavorite(story.id, story.isFavorite)}
+          onToggleFavorite={() => handleToggleFavorite(story.id, story.isFavorite ?? false)}
           onDelete={() => handleDeleteStory(story.id)}
         />
       ))}

@@ -11,7 +11,7 @@ import {
   PlayHistoryEntry
 } from "@/lib/services/history-service";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/auth.config";;
 
 export default async function HistoryPage() {
   // Get the session on the server side

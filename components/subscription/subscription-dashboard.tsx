@@ -66,7 +66,7 @@ export function SubscriptionDashboard({
     try {
       // Create checkout URL
       const response = await createCheckoutAction(
-        planId as 'premium' | 'family',
+        planId as 'premium' | 'premium_plus',
         billingPeriod as 'monthly' | 'annual'
       );
       

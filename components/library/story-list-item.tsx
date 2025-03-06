@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -89,7 +90,7 @@ export function StoryListItem({ story, onToggleFavorite, onDelete }: StoryListIt
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
           <div className="flex items-center text-xs text-gray-400">
             <Clock className="h-3 w-3 mr-1" />
-            {formatDuration(story.duration)}
+            {formatDuration(story.duration || 0)}
           </div>
           
           <div className="flex items-center text-xs text-gray-400">
@@ -99,12 +100,12 @@ export function StoryListItem({ story, onToggleFavorite, onDelete }: StoryListIt
           
           <div className="flex items-center text-xs text-gray-400">
             <CalendarDays className="h-3 w-3 mr-1" />
-            {formatDate(story.createdAt)}
+            {formatDate(story.createdAt || new Date)}
           </div>
         </div>
         
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {story.tags.map((tag: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined, index: Key | null | undefined) => (
+          {story?.tags?.map((tag: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined, index: Key | null | undefined) => (
             <Badge 
               key={index} 
               variant="outline" 

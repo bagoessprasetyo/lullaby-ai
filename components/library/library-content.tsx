@@ -5,6 +5,7 @@ import { StoryGrid } from "@/components/library/story-grid";
 import { StoryList } from "@/components/library/story-list";
 import { getStoriesWithFilters } from "@/lib/services/story-service";
 import { Search } from "lucide-react";
+import { Story } from "@/types/story";
 
 // Ensure no caching for this component
 export const dynamic = 'force-dynamic';
@@ -77,25 +78,36 @@ export async function LibraryContent({
     );
   }
 
-  // Format story data for components
-  const formattedStories = stories.map((story) => ({
+  // Format story data for components to match the Story type
+  const formattedStories: Story[] = stories.map((story) => ({
     id: story.id,
+    user_id: story.user_id || userId,
     title: story.title,
-    coverImage:
-      story.images && story.images.length > 0
-        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
-        : "https://via.placeholder.com/300x300?text=No+Image",
-    duration: story.duration || 0,
+    text_content: story.text_content || null,
     language: story.language || "en",
-    createdAt: new Date(story.created_at),
-    isFavorite: story.is_favorite,
-    thumbnail:
-      story.images && story.images.length > 0
-        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
-        : "https://via.placeholder.com/100x100?text=No+Image",
+    duration: story.duration || 0,
+    audio_url: story.audio_url || null,
+    theme: story.theme || "",
+    created_at: story.created_at,
+    is_favorite: story.is_favorite || false,
+    play_count: story.play_count || 0,
+    background_music_id: story.background_music_id || null,
+    voice_profile_id: story.voice_profile_id || null,
+    storage_path: story.storage_path || null,
+    // Additional display properties
+    coverImage: story.images && story.images.length > 0
+      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
+      : "https://via.placeholder.com/300x300?text=No+Image",
+    thumbnail: story.images && story.images.length > 0
+      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
+      : "https://via.placeholder.com/100x100?text=No+Image",
     backgroundMusic: "", // Could be fetched if needed
     characters: [], // Could be fetched if needed
     tags: [], // Could be fetched if needed
+    // Add createdAt as a Date object for client components
+    createdAt: new Date(story.created_at),
+    // Map is_favorite to isFavorite for client components
+    isFavorite: story.is_favorite
   }));
 
   // Return either grid or list view based on viewMode

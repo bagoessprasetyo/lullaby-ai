@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Lock, Sparkles } from "lucide-react";
+import { AlertCircle, Lock, Sparkles, Star } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,13 +13,15 @@ interface PremiumFeatureAlertProps {
   featureName?: string;
   className?: string;
   variant?: "default" | "small" | "inline" | "banner";
+  requiredTier?: "premium" | "premium_plus";
 }
 
 export function PremiumFeatureAlert({
   message = "This is a premium feature. Upgrade to access.",
   featureName,
   className,
-  variant = "default"
+  variant = "default",
+  requiredTier = "premium"
 }: PremiumFeatureAlertProps) {
   const { openModal } = useUpgradeModal();
   
@@ -27,13 +29,19 @@ export function PremiumFeatureAlert({
     openModal(featureName);
   };
   
+  const tierLabel = requiredTier === "premium_plus" ? "Premium+" : "Premium";
+  const TierIcon = requiredTier === "premium_plus" ? Star : Sparkles;
+  
   // Small inline variant (e.g. for component headers)
   if (variant === "inline") {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <Badge className="bg-amber-900/60 text-amber-300">
+        <Badge className={cn(
+          "text-amber-300",
+          requiredTier === "premium_plus" ? "bg-amber-900/60" : "bg-indigo-900/60"
+        )}>
           <Lock className="h-3 w-3 mr-1" />
-          Premium
+          {tierLabel}
         </Badge>
         <Button 
           variant="link" 
@@ -54,7 +62,7 @@ export function PremiumFeatureAlert({
         <div className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-amber-400" />
           <span className="text-sm text-amber-300">
-            {featureName ? `${featureName} is a premium feature` : "Premium feature"}
+            {featureName ? `${featureName} is a ${tierLabel} feature` : `${tierLabel} feature`}
           </span>
         </div>
         <Button 
@@ -72,22 +80,39 @@ export function PremiumFeatureAlert({
   // Full banner variant
   if (variant === "banner") {
     return (
-      <div className={cn("bg-gradient-to-r from-amber-900/30 to-indigo-900/30 border border-amber-800 rounded-lg p-6 text-center", className)}>
-        <div className="bg-amber-900/20 rounded-full p-3 inline-flex mb-4">
-          <Sparkles className="h-7 w-7 text-amber-400" />
+      <div className={cn(
+        "border border-amber-800 rounded-lg p-6 text-center",
+        requiredTier === "premium_plus" 
+          ? "bg-gradient-to-r from-amber-900/30 to-amber-800/30" 
+          : "bg-gradient-to-r from-indigo-900/30 to-indigo-800/30",
+        className
+      )}>
+        <div className={cn(
+          "rounded-full p-3 inline-flex mb-4",
+          requiredTier === "premium_plus" ? "bg-amber-900/20" : "bg-indigo-900/20"
+        )}>
+          <TierIcon className={cn(
+            "h-7 w-7", 
+            requiredTier === "premium_plus" ? "text-amber-400" : "text-indigo-400"
+          )} />
         </div>
         <h4 className="text-lg font-medium text-white mb-2">
-          {featureName ? `${featureName} is a Premium Feature` : "Premium Feature"}
+          {featureName ? `${featureName} is a ${tierLabel} Feature` : `${tierLabel} Feature`}
         </h4>
         <p className="text-gray-300 mb-4 max-w-md mx-auto">
           {message}
         </p>
         <Button 
           onClick={handleUpgrade}
-          className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white"
+          className={cn(
+            "text-white",
+            requiredTier === "premium_plus" 
+              ? "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800"
+              : "bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800"
+          )}
         >
-          <Sparkles className="mr-2 h-4 w-4" />
-          Upgrade to Premium
+          <TierIcon className="mr-2 h-4 w-4" />
+          Upgrade to {tierLabel}
         </Button>
       </div>
     );
@@ -95,8 +120,15 @@ export function PremiumFeatureAlert({
   
   // Default alert variant
   return (
-    <Alert className={cn("bg-amber-900/20 border-amber-800", className)}>
-      <AlertCircle className="h-4 w-4 text-amber-400" />
+    <Alert className={cn(
+      "border-amber-800", 
+      requiredTier === "premium_plus" ? "bg-amber-900/20" : "bg-indigo-900/20",
+      className
+    )}>
+      <AlertCircle className={cn(
+        "h-4 w-4", 
+        requiredTier === "premium_plus" ? "text-amber-400" : "text-indigo-400"
+      )} />
       <AlertDescription className="flex justify-between items-center w-full">
         <span className="text-amber-300">{message}</span>
         <Button 
@@ -104,7 +136,7 @@ export function PremiumFeatureAlert({
           onClick={handleUpgrade}
           className="text-amber-400 hover:text-amber-300"
         >
-          Upgrade to Premium
+          Upgrade to {tierLabel}
         </Button>
       </AlertDescription>
     </Alert>

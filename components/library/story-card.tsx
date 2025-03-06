@@ -27,9 +27,10 @@ import {
   Globe,
   Clock,
 } from "lucide-react";
-import { Story } from "@/app/dashboard/library/page";
+// import { Story } from "@/app/dashboard/library/page";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/format-duration";
+import { Story } from "@/types/story";
 
 interface StoryCardProps {
   story: Story;
@@ -80,7 +81,7 @@ export function StoryCard({ story, onToggleFavorite, onDelete }: StoryCardProps)
         {/* Duration Badge */}
         <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 text-xs text-white flex items-center gap-1">
           <Clock className="h-3 w-3 text-gray-300" />
-          {formatDuration(story.duration)}
+          {formatDuration(story.duration || 0)}
         </div>
         
         {/* Language Badge */}
@@ -169,13 +170,13 @@ export function StoryCard({ story, onToggleFavorite, onDelete }: StoryCardProps)
         </div>
         
         <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
-          <span>Created {formatDate(story.createdAt)}</span>
+          <span>Created {formatDate(story.createdAt ?? new Date())}</span>
         </div>
       </CardContent>
       
       <CardFooter className="p-4 pt-0">
         <div className="flex flex-wrap gap-1.5">
-          {story.tags.map((tag, index) => (
+          {story?.tags?.map((tag, index) => (
             <Badge 
               key={index} 
               variant="outline" 

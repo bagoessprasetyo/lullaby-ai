@@ -1,10 +1,9 @@
-"use client";
-
-import { useState } from "react";
-import { useSession } from "next-auth/react";
+// app/dashboard/settings/page.tsx
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/auth.config";
+import { redirect } from "next/navigation";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import { AccountSettings } from "@/components/settings/account-settings";
 import { PreferenceSettings } from "@/components/settings/preference-settings";
@@ -12,23 +11,24 @@ import { NotificationSettings } from "@/components/settings/notification-setting
 import { StorageSettings } from "@/components/settings/storage-settings";
 import { VoiceProfilesSettings } from "@/components/settings/voice-profiles-settings";
 import { User, KeyRound, Settings2, BellRing, HardDrive, Mic } from "lucide-react";
+import { getUserSettingsAction } from "@/app/actions/settings-actions";
+// import { getSession } from "@/auth";
 
-export default function SettingsPage() {
-  const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState("profile");
-  const [isSubscriber, setIsSubscriber] = useState(true); // Mock subscription status
-  const [subscriptionTier, setSubscriptionTier] = useState("premium"); // "premium" or "family"
-
-  if (status === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-          <p className="text-gray-400">Loading settings...</p>
-        </div>
-      </div>
-    );
+export default async function SettingsPage() {
+  // Get the session
+  const session = await getServerSession(authOptions);
+  
+  // Redirect if not authenticated
+  if (!session || !session.user) {
+    redirect("/");
   }
+  
+  // Fetch user settings from the server action
+  const { profile, preferences } = await getUserSettingsAction();
+  
+  // Determine subscription status from profile
+  const isSubscriber = profile.subscription_tier !== 'free';
+  const subscriptionTier = profile.subscription_tier || 'free';
 
   return (
     <>
@@ -43,8 +43,6 @@ export default function SettingsPage() {
 
         <Tabs
           defaultValue="profile"
-          value={activeTab}
-          onValueChange={setActiveTab}
           className="space-y-6"
         >
           <TabsList className="bg-gray-900/70 border border-gray-800 p-1 w-full flex overflow-x-auto">
@@ -94,15 +92,15 @@ export default function SettingsPage() {
 
           <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-6">
             <TabsContent value="profile" className="space-y-6">
-              <ProfileSettings user={session?.user} />
+              <ProfileSettings user={session.user} profile={profile} />
             </TabsContent>
 
             <TabsContent value="account" className="space-y-6">
-              <AccountSettings user={session?.user} />
+              <AccountSettings user={session.user} />
             </TabsContent>
 
             <TabsContent value="preferences" className="space-y-6">
-              <PreferenceSettings />
+              <PreferenceSettings preferences={preferences} />
             </TabsContent>
             
             <TabsContent value="voice-profiles" className="space-y-6">
@@ -113,7 +111,7 @@ export default function SettingsPage() {
             </TabsContent>
 
             <TabsContent value="notifications" className="space-y-6">
-              <NotificationSettings />
+              <NotificationSettings preferences={preferences} />
             </TabsContent>
 
             <TabsContent value="storage" className="space-y-6">

@@ -1,6 +1,6 @@
 // app/dashboard/billing-history/page.tsx
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/auth.config";;
 import { redirect } from "next/navigation";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
 import { BillingHistoryTable } from "@/components/subscription/billing-history-table";

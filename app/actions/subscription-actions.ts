@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getAdminClient, supabase } from '@/lib/supabase';
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/auth.config";;
 import { getServerSession } from "next-auth";
 import { 
   lemonSqueezySetup,
@@ -11,7 +11,15 @@ import {
 } from "@lemonsqueezy/lemonsqueezy.js";
 import { SubscriptionTier, BillingPeriod } from '@/types/subscription';
 
-// Define subscription plans with LemonSqueezy variant IDs
+interface CheckoutOptions {
+  custom_price?: number;
+  enabled_variants?: number[];
+  button_color?: string;
+  discount_code?: string;
+  expires_at?: string;
+}
+
+// Updated subscription plans with new tiers
 const SUBSCRIPTION_PLANS = {
   premium: {
     monthly: {
@@ -25,16 +33,16 @@ const SUBSCRIPTION_PLANS = {
       variantId: process.env.LEMON_SQUEEZY_PREMIUM_ANNUAL_VARIANT_ID,
     }
   },
-  family: {
+  premium_plus: {
     monthly: {
-      name: 'Family Monthly',
+      name: 'Premium+ Monthly',
       price: 14.99,
-      variantId: process.env.LEMON_SQUEEZY_FAMILY_MONTHLY_VARIANT_ID,
+      variantId: process.env.LEMON_SQUEEZY_PREMIUM_PLUS_MONTHLY_VARIANT_ID,
     },
     annual: {
-      name: 'Family Annual',
+      name: 'Premium+ Annual',
       price: 149.99,
-      variantId: process.env.LEMON_SQUEEZY_FAMILY_ANNUAL_VARIANT_ID,
+      variantId: process.env.LEMON_SQUEEZY_PREMIUM_PLUS_ANNUAL_VARIANT_ID,
     }
   }
 };
@@ -59,36 +67,65 @@ export async function createCheckoutAction(
   }
   
   try {
-    const plan = planId in SUBSCRIPTION_PLANS ? SUBSCRIPTION_PLANS[planId as keyof typeof SUBSCRIPTION_PLANS][billingPeriod] : undefined;
+    // Validate plan ID - must be premium or premium_plus
+    if (planId !== 'premium' && planId !== 'premium_plus') {
+      throw new Error('Invalid subscription plan');
+    }
+    
+    const plan = SUBSCRIPTION_PLANS[planId][billingPeriod];
     if (!plan?.variantId) {
       throw new Error('Invalid subscription plan');
     }
 
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    console.log('plan ', plan);
     // Latest checkout creation format
-    const checkoutData = {
-      custom: {
-        user_id: session.user.id,
-        plan_id: planId,
-        billing_period: billingPeriod
+    const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/vnd.api+json',
+        'Accept': 'application/vnd.api+json',
+        'Authorization': `Bearer ${process.env.LEMON_SQUEEZY_API_KEY}`
       },
-      productOptions: {
-        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/subscription?success=true`
-      },
-      checkoutOptions: {
-        embed: false,
-        media: false
-      }
-    };
+      body: JSON.stringify({
+        data: {
+          type: "checkouts",
+          attributes: {
+            custom_price: plan.price * 100, // Convert to cents
+            product_options: {
+              enabled_variants: [parseInt(plan.variantId, 10)]
+            },
+            checkout_options: {
+              button_color: "#7047EB"
+            },
+            checkout_data: {
+              custom: {
+                user_id: session.user.id,
+                plan_id: planId,
+                billing_period: billingPeriod
+              },
+              email: session.user.email,
+              name: session.user.name
+            },
+            expires_at: expiresAt,
+            preview: process.env.NODE_ENV === 'development'
+          },
+          relationships: {
+            store: {
+              data: { type: "stores", id: process.env.LEMON_SQUEEZY_STORE_ID }
+            },
+            variant: {
+              data: { type: "variants", id: plan.variantId }
+            }
+          }
+        }
+      })
+    });
 
-    const { data: checkout, error } = await createCheckout(
-      process.env.LEMON_SQUEEZY_STORE_ID!,
-      plan.variantId,
-      checkoutData
-    );
-
-    if (error) throw error;
-    if (!checkout?.data.attributes.url) {
-      throw new Error('Failed to create checkout URL');
+    const checkout = await response.json();
+    console.log('checkout', checkout)
+    if (!response.ok || !checkout?.data?.attributes?.url) {
+      throw new Error(checkout?.error || 'Failed to create checkout URL');
     }
 
     return { 
@@ -159,19 +196,74 @@ export async function getSubscriptionAction() {
 /**
  * Create customer portal URL for subscription management
  */
-
+export async function updateSubscriptionAction() {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user?.id) {
+    throw new Error('You must be logged in to perform this action');
+  }
+  
+  try {
+    
+    // Get user's LemonSqueezy customer ID and subscription ID
+    const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+    const { data: profile, error: profileError } = await client
+      .from('profiles')
+      .select('lemonsqueezy_customer_id, lemonsqueezy_subscription_id')
+      .eq('id', session.user.id)
+      .single();
+    
+    if (profileError || !profile?.lemonsqueezy_subscription_id) {
+      throw new Error('No active subscription found');
+    }
+    
+    // Generate a customer portal URL using LemonSqueezy API
+    // This is a placeholder - in a real implementation, you would call the LemonSqueezy API
+    const portalUrl = `https://app.lemonsqueezy.com/my-orders/?subscription_id=${profile.lemonsqueezy_subscription_id}`;
+    
+    return {
+      success: true,
+      url: portalUrl
+    };
+  } catch (error) {
+    console.error('Error creating customer portal URL:', error);
+    throw new Error('Failed to create customer portal URL');
+  }
+}
 
 /**
  * Cancel subscription by redirecting to customer portal
  */
-
-/**
- * Update subscription by redirecting to customer portal
- */
-
-// Fix type assertion in plan selection
-// Remove unused placeholder function
-// DELETE THIS:
-function retrieveSubscription(arg0: { subscriptionId: any; }): { data: any; } | PromiseLike<{ data: any; }> {
-  throw new Error('Function not implemented.');
+export async function cancelSubscriptionAction() {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user?.id) {
+    throw new Error('You must be logged in to perform this action');
+  }
+  
+  try {
+    // Get user's LemonSqueezy customer ID and subscription ID
+    const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+    const { data: profile, error: profileError } = await client
+      .from('profiles')
+      .select('lemonsqueezy_customer_id, lemonsqueezy_subscription_id')
+      .eq('id', session.user.id)
+      .single();
+    
+    if (profileError || !profile?.lemonsqueezy_subscription_id) {
+      throw new Error('No active subscription found');
+    }
+    
+    // Generate a customer portal URL with cancel intent using LemonSqueezy API
+    // This is a placeholder - in a real implementation, you would call the LemonSqueezy API
+    const cancelUrl = `https://app.lemonsqueezy.com/my-orders/?subscription_id=${profile.lemonsqueezy_subscription_id}&action=cancel`;
+    
+    return {
+      success: true,
+      url: cancelUrl
+    };
+  } catch (error) {
+    console.error('Error creating cancellation URL:', error);
+    throw new Error('Failed to create cancellation URL');
+  }
 }

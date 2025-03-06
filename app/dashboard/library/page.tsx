@@ -5,15 +5,16 @@ import { LibraryHeader } from "@/components/library/library-header";
 import { LibraryFilters } from "@/components/library/library-filters";
 import { LibraryContent } from "@/components/library/library-content";
 import { RecentStoriesSection } from "@/components/library/recent-stories-section";
-import { getStoriesWithFilters, getStoryCount } from "@/lib/services/story-service";
+import { getStoryCount } from "@/lib/services/story-service";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/auth.config";
+// import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-export default async function LibraryPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+// Remove the type annotations for the component parameters
+export default async function LibraryPage(props: { searchParams: any; }) {
+  // Extract searchParams from props
+  const { searchParams } = props;
+  
   const session = await getServerSession(authOptions);
   
   if (!session?.user?.id) {
@@ -27,11 +28,11 @@ export default async function LibraryPage({
   }
   
   // Extract search parameters
-  const searchQuery = typeof searchParams.q === 'string' ? searchParams.q : '';
-  const currentTab = typeof searchParams.tab === 'string' ? searchParams.tab : 'all';
-  const sortBy = typeof searchParams.sort === 'string' ? searchParams.sort : 'newest';
-  const filterLanguage = typeof searchParams.language === 'string' ? searchParams.language : null;
-  const viewMode = typeof searchParams.view === 'string' ? 
+  const searchQuery = typeof searchParams?.q === 'string' ? searchParams.q : '';
+  const currentTab = typeof searchParams?.tab === 'string' ? searchParams.tab : 'all';
+  const sortBy = typeof searchParams?.sort === 'string' ? searchParams.sort : 'newest';
+  const filterLanguage = typeof searchParams?.language === 'string' ? searchParams.language : null;
+  const viewMode = typeof searchParams?.view === 'string' ? 
     (searchParams.view === 'list' ? 'list' : 'grid') : 'grid';
   
   // Get total story count for the user

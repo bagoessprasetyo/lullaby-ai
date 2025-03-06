@@ -1,9 +1,8 @@
 "use client";
 
-import { SubscriptionPlan, SubscriptionState, BillingPeriod } from '@/types/subscription';
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Sparkles, CreditCard } from "lucide-react";
+import { Check, Sparkles, CreditCard, Star } from "lucide-react";
 import { 
   Dialog, 
   DialogContent,
@@ -24,72 +23,59 @@ interface UpgradeModalProps {
   highlightedFeature?: string;
 }
 
-const defaultPlans: SubscriptionPlan[] = [
-  {
-    id: "premium",
-    name: "Premium",
-    description: "Perfect for individual use",
-    price: 9.99,
-    period: 'monthly',
-    features: [
-      "Unlimited AI-generated stories",
-      "All story lengths (including long)",
-      "Background music library",
-      "3 custom voice profiles",
-      "Premium AI voices",
-      "Ad-free experience"
-    ]
-  },
-  {
-    id: "family",
-    name: "Family",
-    description: "Best for families with multiple children",
-    price: 14.99,
-    period: 'annual',
-    features: [
-      "Everything in Premium",
-      "Up to 10 custom voice profiles",
-      "Family sharing (up to 5 members)",
-      "Educational story templates",
-      "Story series & collections",
-      "Premium support"
-    ]
-  }
-];
-
 export function UpgradeModal({ 
   isOpen, 
   onOpenChange,
   highlightedFeature
 }: UpgradeModalProps) {
   const [isAnnual, setIsAnnual] = useState(true);
-  const [selectedPlan, setSelectedPlan] = useState<"premium" | "family">("premium");
+  const [selectedPlan, setSelectedPlan] = useState<"premium" | "premium_plus">("premium");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [state, setState] = useState<SubscriptionState>({
-    isProcessing: false,
-    selectedPlan: 'premium',
-    billingPeriod: 'annual'
-  });
-  // Plans data
-  const plans = useMemo(() => {
-    return defaultPlans.map(plan => ({
-      ...plan,
-      price: state.billingPeriod === 'annual' ? 
-        Math.round(plan.price * 0.8 * 100) / 100 : // Round to 2 decimal places
-        plan.price
-    }));
-  }, [state.billingPeriod]);
+
+  // Updated plans data
+  const plans = [
+    {
+      id: "premium",
+      name: "Premium",
+      description: "Enhanced features for your bedtime stories",
+      price: isAnnual ? 7.99 : 9.99,
+      features: [
+        "30 AI-generated stories per month",
+        "All story lengths (including long)",
+        "Premium AI voices",
+        "Advanced image analysis",
+        "Unlimited story storage",
+        "Background music",
+        "2 custom voice profiles"
+      ]
+    },
+    {
+      id: "premium_plus",
+      name: "Premium+",
+      description: "Premium features with expanded capacity",
+      price: isAnnual ? 12.99 : 14.99,
+      features: [
+        "100 AI-generated stories per month",
+        "Everything in Premium",
+        "5 custom voice profiles",
+        "Educational story templates",
+        "Custom character creation",
+        "Story series & collections",
+        "Exclusive story themes"
+      ]
+    }
+  ];
 
   const handleUpgrade = async () => {
     setIsProcessing(true);
     
     try {
-      // Call the LemonSqueezy checkout action
+      // Call the checkout action
       const billingPeriod = isAnnual ? 'annual' : 'monthly';
-      const result = await createCheckoutAction(selectedPlan, billingPeriod);
-      
+      const result = await createCheckoutAction(selectedPlan as any, billingPeriod);
+      console.log('result',result)
       if (result.success && result.url) {
-        // Redirect to LemonSqueezy checkout
+        // Redirect to checkout
         window.location.href = result.url;
       } else {
         // Handle error
@@ -112,11 +98,13 @@ export function UpgradeModal({
             <Sparkles className="h-5 w-5 text-indigo-400" />
             Upgrade Your Experience
           </DialogTitle>
-          <DialogDescription asChild>
-            <div className="mt-2 bg-indigo-900/30 border border-indigo-800 rounded p-2 text-indigo-300">
-              {highlightedFeature}
-            </div>
-          </DialogDescription>
+          {highlightedFeature && (
+            <DialogDescription asChild>
+              <div className="mt-2 bg-indigo-900/30 border border-indigo-800 rounded p-2 text-indigo-300">
+                {highlightedFeature}
+              </div>
+            </DialogDescription>
+          )}
         </DialogHeader>
         
         {/* Billing Toggle */}
@@ -147,7 +135,7 @@ export function UpgradeModal({
               key={plan.id}
               whileHover={{ y: -5 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              onClick={() => setSelectedPlan(plan.id as "premium" | "family")}
+              onClick={() => setSelectedPlan(plan.id as "premium" | "premium_plus")}
             >
               <div 
                 className={cn(
@@ -158,7 +146,14 @@ export function UpgradeModal({
                 )}
               >
                 <div className="mb-2">
-                  <h3 className="text-lg font-medium text-white">{plan.name}</h3>
+                  <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                    {plan.id === "premium" ? (
+                      <Sparkles className="h-4 w-4 text-indigo-400" />
+                    ) : (
+                      <Star className="h-4 w-4 text-amber-400" />
+                    )}
+                    {plan.name}
+                  </h3>
                   <p className="text-sm text-gray-400">{plan.description}</p>
                 </div>
                 
@@ -168,9 +163,14 @@ export function UpgradeModal({
                       ${plan.price.toFixed(2)}
                     </span>
                     <span className="text-gray-400 ml-2">
-                      /{isAnnual ? 'year' : 'month'}
+                      / month
                     </span>
                   </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {isAnnual 
+                      ? `Billed annually (${(plan.price * 12).toFixed(2)}/year)` 
+                      : "Billed monthly"}
+                  </p>
                 </div>
                 
                 <div className="flex-grow mb-4">
@@ -192,7 +192,7 @@ export function UpgradeModal({
                         ? "bg-indigo-600 hover:bg-indigo-700"
                         : "bg-gray-700 hover:bg-gray-600"
                     )}
-                    onClick={() => setSelectedPlan(plan.id as "premium" | "family")}
+                    onClick={() => setSelectedPlan(plan.id as "premium" | "premium_plus")}
                   >
                     {selectedPlan === plan.id ? "Selected" : "Select Plan"}
                   </Button>
@@ -223,7 +223,7 @@ export function UpgradeModal({
             ) : (
               <>
                 <CreditCard className="mr-2 h-4 w-4" />
-                Upgrade to {selectedPlan === "premium" ? "Premium" : "Family"}
+                Upgrade to {selectedPlan === "premium" ? "Premium" : "Premium+"}
               </>
             )}
           </Button>

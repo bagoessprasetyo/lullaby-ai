@@ -1,23 +1,10 @@
-// app/actions/subscription.ts
+// app/actions/subscriptions.ts
 "use server";
 
 import { getAdminClient } from '@/lib/supabase';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-
-export interface SubscriptionFeatures {
-  success: boolean;
-  subscription_tier: string;
-  features: {
-    long_stories: boolean;
-    background_music: boolean;
-    custom_voices: boolean;
-    educational_themes: boolean;
-    story_sharing: boolean;
-    unlimited_storage: boolean;
-    max_images: number;
-  };
-}
+import { authOptions } from "@/auth.config";;
+import { SubscriptionFeatures } from '@/types/subscription';
 
 export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | null> {
   try {
@@ -39,9 +26,6 @@ export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | 
       .eq('id', session.user.id)
       .single();
     
-    console.log('User ID for profile query:', session.user.id);
-    console.log('Query result:', data);
-    
     if (error) {
       console.error("Database query error:", error);
       throw error;
@@ -60,16 +44,33 @@ export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | 
       success: true,
       subscription_tier,
       features: {
-        long_stories: ['premium', 'family'].includes(subscription_tier),
-        background_music: ['premium', 'family'].includes(subscription_tier),
-        custom_voices: ['premium', 'family'].includes(subscription_tier),
-        educational_themes: ['premium', 'family'].includes(subscription_tier),
-        story_sharing: subscription_tier === 'family',
-        unlimited_storage: ['premium', 'family'].includes(subscription_tier),
-        max_images: ['premium', 'family'].includes(subscription_tier) ? 5 : 3
+        // Implement the new limits based on tier
+        story_limit: subscription_tier === 'free' ? 5 : 
+                    subscription_tier === 'premium' ? 30 : 
+                    subscription_tier === 'premium_plus' ? 100 : 5,
+        
+        long_stories: subscription_tier !== 'free',
+        
+        background_music: subscription_tier !== 'free',
+        
+        custom_voices: subscription_tier === 'free' ? 0 : 
+                       subscription_tier === 'premium' ? 2 : 
+                       subscription_tier === 'premium_plus' ? 5 : 0,
+        
+        educational_themes: subscription_tier === 'premium_plus',
+        
+        custom_characters: subscription_tier === 'premium_plus',
+        
+        story_series: subscription_tier === 'premium_plus',
+        
+        exclusive_themes: subscription_tier === 'premium_plus',
+        
+        unlimited_storage: subscription_tier !== 'free',
+        
+        max_images: subscription_tier === 'free' ? 3 : 5
       }
     };
-    console.log('Query FEATURES:', features);
+    
     return features;
     
   } catch (err) {

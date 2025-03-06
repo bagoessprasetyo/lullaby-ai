@@ -1,4 +1,5 @@
-export type SubscriptionTier = 'free' | 'premium' | 'family';
+// types/subscription.ts
+export type SubscriptionTier = 'free' | 'premium' | 'premium_plus';
 export type SubscriptionStatus = 'active' | 'trialing' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'unpaid';
 export type BillingPeriod = 'monthly' | 'annual';
 
@@ -9,8 +10,6 @@ export interface SubscriptionPlan {
   price: number;
   period: BillingPeriod;
   features: string[];
-  stripeProductId?: string; // Add this for Stripe integration
-  stripePriceId?: string;   // Add this for Stripe integration
 }
 
 export interface SubscriptionState {
@@ -23,20 +22,15 @@ export interface SubscriptionFeatures {
   success: boolean;
   subscription_tier: string;
   features: {
+    story_limit: number;
     long_stories: boolean;
     background_music: boolean;
-    custom_voices: boolean;
+    custom_voices: number;
     educational_themes: boolean;
-    story_sharing: boolean;
+    custom_characters: boolean;
+    story_series: boolean;
+    exclusive_themes: boolean;
     unlimited_storage: boolean;
     max_images: number;
   };
-}
-
-export interface StripeCustomer {
-  id: string;
-  email: string;
-  name?: string;
-  subscriptionId?: string;
-  priceId?: string;
 }

@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // app/dashboard/stories/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
@@ -17,7 +18,8 @@ import {
   ChevronDown,
   X,
   Filter,
-  PlayCircle
+  PlayCircle,
+  Loader2
 } from "lucide-react";
 import { Story } from "@/types/story";
 import { formatDuration } from "@/lib/format-duration";
@@ -60,7 +62,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { createApiServices } from "@/lib/api/apiService";
 import Link from "next/link";
 
-export default function StoriesPage() {
+// Separate the content that uses useSearchParams into its own component
+function StoriesContent() {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -235,7 +238,6 @@ export default function StoriesPage() {
   
   return (
     <>
-      <DashboardNavbar />
       <div className="container max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -656,6 +658,25 @@ export default function StoriesPage() {
           </div>
         )}
       </div>
+    </>
+  );
+}
+
+// Main component that uses Suspense
+export default function StoriesPage() {
+  return (
+    <>
+      <DashboardNavbar />
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            <p className="text-gray-400">Loading stories...</p>
+          </div>
+        </div>
+      }>
+        <StoriesContent />
+      </Suspense>
     </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getAdminClient, supabase } from '@/lib/supabase';
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/auth.config";
 import { getServerSession } from "next-auth";
 
 /**

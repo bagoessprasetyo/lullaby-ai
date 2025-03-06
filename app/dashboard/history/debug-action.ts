@@ -1,7 +1,7 @@
 'use server';
 
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"; // Adjust path as needed
+import { authOptions } from "@/auth.config";; // Adjust path as needed
 import { 
   getListeningPatterns,
   PlayHistoryEntry,

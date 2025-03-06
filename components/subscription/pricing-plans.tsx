@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, X, Sparkles, Home, Users, RefreshCw } from "lucide-react";
+import { Check, X, Sparkles, Home, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ interface PricingPlansProps {
 export function PricingPlans({ currentPlan, onSelectPlan, isLoading = false }: PricingPlansProps) {
   const [isAnnual, setIsAnnual] = useState(true);
   
-  // Define pricing plans
+  // Define pricing plans with updated features
   const plans = [
     {
       id: "free",
@@ -36,7 +36,6 @@ export function PricingPlans({ currentPlan, onSelectPlan, isLoading = false }: P
         { name: "Store up to 10 stories", included: true },
         { name: "Background music", included: false },
         { name: "Custom voice profiles", included: false },
-        { name: "Ad-free experience", included: false },
         { name: "Long stories (5+ minutes)", included: false },
       ],
       cta: "Current Plan",
@@ -52,15 +51,13 @@ export function PricingPlans({ currentPlan, onSelectPlan, isLoading = false }: P
         annually: 7.99,
       },
       features: [
-        { name: "Unlimited AI-generated stories", included: true },
+        { name: "30 AI-generated stories per month", included: true },
         { name: "All story lengths (including long)", included: true },
         { name: "Premium AI voices", included: true },
         { name: "Advanced image analysis", included: true },
         { name: "Unlimited story storage", included: true },
         { name: "Background music", included: true },
-        { name: "3 custom voice profiles", included: true },
-        { name: "Ad-free experience", included: true },
-        { name: "Priority support", included: true },
+        { name: "2 custom voice profiles", included: true },
       ],
       cta: "Upgrade to Premium",
       highlight: true,
@@ -68,27 +65,25 @@ export function PricingPlans({ currentPlan, onSelectPlan, isLoading = false }: P
       icon: <Sparkles className="h-5 w-5" />,
     },
     {
-      id: "family",
-      name: "Family",
-      description: "Perfect for families with multiple children",
+      id: "premium_plus",
+      name: "Premium+",
+      description: "Premium features with expanded capacity for families",
       price: {
         monthly: 14.99,
         annually: 12.99,
       },
       features: [
+        { name: "100 AI-generated stories per month", included: true },
         { name: "Everything in Premium", included: true },
-        { name: "Up to 10 custom voice profiles", included: true },
-        { name: "Family sharing (up to 5 members)", included: true },
-        { name: "Advanced customization options", included: true },
+        { name: "5 custom voice profiles", included: true },
         { name: "Educational story templates", included: true },
         { name: "Custom character creation", included: true },
         { name: "Story series & collections", included: true },
         { name: "Exclusive story themes", included: true },
-        { name: "Premium support", included: true },
       ],
-      cta: "Get Family Plan",
+      cta: "Get Premium+",
       highlight: false,
-      icon: <Users className="h-5 w-5" />,
+      icon: <Star className="h-5 w-5" />,
     },
   ];
 
@@ -217,7 +212,7 @@ export function PricingPlans({ currentPlan, onSelectPlan, isLoading = false }: P
                 >
                   {isLoading ? (
                     <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
                       Processing...
                     </>
                   ) : currentPlan === plan.id ? (

@@ -1,16 +1,13 @@
 // app/dashboard/subscription/page.tsx
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/auth.config";;
 import { redirect } from "next/navigation";
 import { SubscriptionDashboard } from "@/components/subscription/subscription-dashboard";
 import { getSubscriptionAction } from "@/app/actions/subscription-actions";
 
-export default async function SubscriptionPage({
-  searchParams,
-}: {
-  searchParams: { success?: string; canceled?: string; session_id?: string };
-}) {
+export default async function SubscriptionPage(props: { searchParams: any; }) {
   // Get server-side session
+  const { searchParams } = props;
   const session = await getServerSession(authOptions);
   
   // Redirect to home if not authenticated

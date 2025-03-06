@@ -2,8 +2,6 @@
 export interface Story {
   id: string;
   user_id: string;
-  coverImage: string;
-  thumbnail: string;
   title: string;
   text_content: string | null;
   language: string;
@@ -16,10 +14,15 @@ export interface Story {
   background_music_id: string | null;
   voice_profile_id: string | null;
   storage_path: string | null;
-  images?: StoryImage[];
-  characters?: StoryCharacter[];
-  tags?: StoryTag[];
+  // UI specific properties
+  coverImage?: string;
+  thumbnail?: string;
+  createdAt?: Date;
+  isFavorite?: boolean;
   backgroundMusic?: string;
+  characters?: any[];
+  tags?: string[];
+  images?: StoryImage[];
 }
 
 // types/story.ts
