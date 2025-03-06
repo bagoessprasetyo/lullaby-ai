@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { UpgradeModalProvider } from "@/components/upgrade-modal-providers";
+import { Analytics } from "@vercel/analytics/react"
 
 
 const geistSans = Geist({
@@ -33,6 +34,7 @@ export default function RootLayout({
         <UpgradeModalProvider>
           <AuthProvider>
             {children}
+            <Analytics/>
           </AuthProvider>
         </UpgradeModalProvider>
       </body>
