@@ -26,7 +26,7 @@ export function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
       setIsLoading(true);
       console.log("Starting Google sign in");
       await signIn("google", { 
-        callbackUrl: "/dashboard",
+        callbackUrl: "https://lullaby-ai.com/dashboard",
         redirect: true 
       });
       console.log("Sign in function completed"); // This may not log if redirect is successful
