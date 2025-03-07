@@ -61,7 +61,7 @@ export const authOptions: NextAuthOptions = {
   },
 
   // Enable debug logs in development
-  debug: process.env.NODE_ENV === "development",
+  debug: true,
 
   // Callbacks for customizing authentication behavior
   callbacks: {
