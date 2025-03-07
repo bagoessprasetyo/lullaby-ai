@@ -10,6 +10,10 @@ export default async function DashboardPage() {
   // Get server-side session - make sure getServerSession awaits cookies/headers internally
   const session = await getServerSession(authOptions);
 
+  console.log("[DASHBOARD] Session check:", !!session);
+  console.log("[DASHBOARD] User in session:", session?.user ? 
+    `ID: ${session.user.id}, Name: ${session.user.name}` : "No user");
+
   // Redirect to home if not authenticated
   if (!session || !session.user || !session.user.id) {
     console.log("[SERVER] No valid session, redirecting to home");
