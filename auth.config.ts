@@ -139,6 +139,16 @@ export const authOptions: NextAuthOptions = {
     }
   },
   cookies: {
+    state: {
+      name: 'next-auth.state',
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 900 // 15 minutes in seconds
+      }
+    },
     sessionToken: {
       name: `next-auth.session-token`,
       options: {
