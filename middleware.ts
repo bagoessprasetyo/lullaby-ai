@@ -11,6 +11,9 @@ export default withAuth(
     callbacks: {
       authorized: ({ token }) => !!token,
     },
+    pages: {
+      signIn: "/", // Match the same path defined in your auth.config.ts
+    },
   }
 );
 
