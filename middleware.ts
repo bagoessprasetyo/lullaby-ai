@@ -20,7 +20,8 @@ export default withAuth(
   {
     callbacks: {
       authorized: ({ token }) => {
-        console.log("[MIDDLEWARE] Authorization check:", !!token);
+        console.log("[MIDDLEWARE] Token check:", !!token);
+        if (!token) console.log("[MIDDLEWARE] No token present");
         return !!token;
       },
     },

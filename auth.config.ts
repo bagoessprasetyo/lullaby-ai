@@ -181,11 +181,16 @@ export const authOptions: NextAuthOptions = {
       console.log('User signed out:', message.session?.user?.email);
     }
   },
-
+  jwt: {
+    // Important: This secret must match NEXTAUTH_SECRET
+    secret: process.env.NEXTAUTH_SECRET,
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   // Optional: Add additional configuration
   session: {
     // Choose how you want to store the session
     strategy: 'jwt', // JSON Web Token strategy
+    maxAge: 30 * 24 * 60 * 60, 
   }
     
 } satisfies NextAuthOptions;
