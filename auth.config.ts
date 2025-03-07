@@ -91,17 +91,27 @@ export const authOptions: NextAuthOptions = {
         // Only sync if we have an ID and Supabase URL is configured
         if (oauthId && process.env.NEXT_PUBLIC_SUPABASE_URL) {
           try {
+            console.log(`[SUPABASE] Attempting to find user with OAuth ID: ${oauthId}`);
             // First, try to find by OAuth ID
             let profile = await findUserByOAuthId(oauthId);
             
-            // If not found, sync the user
-            if (!profile) {
+            if (profile) {
+              console.log(`[SUPABASE] Found existing user profile: ${profile.id}`);
+            } else {
+              console.log(`[SUPABASE] Profile not found, attempting to sync`);
+              // If not found, sync the user
               profile = await syncUserWithSupabase({
                 id: oauthId,
                 name: token.name as string || '',
                 email: token.email as string || '',
                 image: token.image as string || ''
               });
+              
+              if (profile) {
+                console.log(`[SUPABASE] User profile created with ID: ${profile.id}`);
+              } else {
+                console.error(`[SUPABASE] Failed to create user profile`);
+              }
             }
             
             if (profile) {
@@ -114,12 +124,13 @@ export const authOptions: NextAuthOptions = {
                 storyCredits: profile.story_credits,
                 voiceCredits: profile.voice_credits
               };
+              console.log(`[SUPABASE] Session updated with profile data`);
             }
           } catch (error) {
-            console.error("Error syncing with Supabase:", error);
+            console.error("[SUPABASE] Error syncing with Supabase:", error);
           }
         } else {
-          console.warn("Skipping Supabase sync due to missing configuration");
+          console.warn("[SUPABASE] Skipping Supabase sync due to missing configuration");
         }
       }
       

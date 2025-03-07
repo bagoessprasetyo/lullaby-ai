@@ -63,7 +63,8 @@ export type Database = {
  */
 export function createClient(cookieStore: ReturnType<typeof cookies>) {
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables');
+    console.error('Missing Supabase environment variables');
+    return null;
   }
   
   return createClientBase<Database>(
