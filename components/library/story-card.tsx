@@ -105,10 +105,10 @@ export function StoryCard({ story, onToggleFavorite, onDelete }: StoryCardProps)
           )}
         >
           <Button 
-            className="bg-indigo-600 hover:bg-indigo-700"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
             onClick={() => router.push(`/dashboard/stories/${story.id}`)}
           >
-            <Play className="h-4 w-4 mr-2" />
+            <Play className="h-4 w-4 mr-2 text-white" />
             Play Story
           </Button>
         </div>
@@ -143,21 +143,21 @@ export function StoryCard({ story, onToggleFavorite, onDelete }: StoryCardProps)
                   </>
                 )}
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              {/* <DropdownMenuItem 
                 className="cursor-pointer" 
                 onClick={() => router.push(`/dashboard/stories/${story.id}/edit`)}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 <span>Edit Story</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              </DropdownMenuItem> */}
+              {/* <DropdownMenuItem className="cursor-pointer">
                 <Share className="h-4 w-4 mr-2" />
                 <span>Share Story</span>
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer">
                 <Download className="h-4 w-4 mr-2" />
                 <span>Download</span>
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
               <DropdownMenuItem 
                 className="cursor-pointer text-red-400 focus:text-red-400" 
                 onClick={onDelete}

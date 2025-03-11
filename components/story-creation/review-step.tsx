@@ -261,7 +261,7 @@ export function ReviewStep({
         <Button 
           onClick={handleGenerateStory}
           disabled={formData.isGenerating}
-          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 w-full md:w-auto md:min-w-[200px] h-12"
+          className="text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 w-full md:w-auto md:min-w-[200px] h-12"
           size="lg"
         >
           {formData.isGenerating ? (
@@ -271,7 +271,7 @@ export function ReviewStep({
             </>
           ) : (
             <>
-              <Sparkles className="mr-2 h-5 w-5" />
+              <Sparkles className="mr-2 h-5 w-5 text-white" />
               Generate Story
             </>
           )}

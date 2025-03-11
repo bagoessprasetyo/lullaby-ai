@@ -65,11 +65,11 @@ export default async function LibraryPage(props: { searchParams: any; }) {
           </Suspense>
         </div>
         
-        {typeof totalCount === 'number' && totalCount > 0 && (
+        {/* {typeof totalCount === 'number' && totalCount > 0 && (
           <Suspense fallback={<RecentStoriesLoadingSkeleton />}>
             <RecentStoriesSection userId={session.user.id} />
           </Suspense>
-        )}
+        )} */}
       </div>
     </>
   );

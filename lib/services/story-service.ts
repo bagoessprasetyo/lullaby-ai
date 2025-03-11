@@ -1,18 +1,44 @@
 // services/story-service.ts
 import { getAdminClient, supabase } from '@/lib/supabase';
+import { StoryImage } from '@/types/story';
 
-export type Story = {
+export interface Story {
   id: string;
-  title: string;
-  created_at: string;
-  language: string;
-  duration: number;
-  is_favorite: boolean;
-  theme: string;
-  audio_url?: string;
   user_id: string;
-  // Add other fields as needed
-};
+  title: string;
+  text_content: string | null;
+  language: string;
+  duration: number | null;
+  audio_url: string | null;
+  theme: string;
+  created_at: string;
+  is_favorite: boolean;
+  play_count: number;
+  background_music_id: string | null;
+  voice_profile_id: string | null;
+  storage_path: string | null;
+  // UI specific properties
+  coverImage?: string;
+  thumbnail?: string;
+  createdAt?: Date;
+  isFavorite?: boolean;
+  backgroundMusic?: string;
+  characters?: any[];
+  tags?: string[];
+  images?: StoryImage[];
+}
+// export type Story = {
+//   id: string;
+//   title: string;
+//   created_at: string;
+//   language: string;
+//   duration: number;
+//   is_favorite: boolean;
+//   theme: string;
+//   audio_url?: string;
+//   user_id: string;
+//   // Add other fields as needed
+// };
 
 
 // Get all stories with filtering, sorting, and pagination
@@ -409,18 +435,10 @@ export async function getStoryById(storyId: string) {
   console.log(`[SERVER] Attempting to fetch story with ID: ${storyId}`);
 
   try {
-    // Use the admin client for server-side operations (bypasses RLS)
-    // Only do this for server components
-    let client;
-    try {
-      client = typeof window === 'undefined' ? getAdminClient() : supabase;
-      console.log(`[SERVER] Using ${typeof window === 'undefined' ? 'admin' : 'regular'} Supabase client`);
-    } catch (error) {
-      console.error("[SERVER] Error getting Supabase client:", error);
-      // Fallback to regular client if admin client fails
-      client = supabase;
-      console.log(`[SERVER] Falling back to regular Supabase client`);
-    }
+    // Always use the admin client from the server to bypass RLS policies
+    const client = getAdminClient();
+    
+    console.log(`[SERVER] Using admin Supabase client to fetch story`);
     
     // First check if the story exists
     const { data: storyExists, error: existsError } = await client
@@ -435,7 +453,7 @@ export async function getStoryById(storyId: string) {
     }
     
     if (!storyExists) {
-      console.error(`[SERVER] Story with ID ${storyId} does not exist in the database`);
+      console.log(`[SERVER] Story with ID ${storyId} does not exist in the database`);
       return null;
     }
     
@@ -456,7 +474,7 @@ export async function getStoryById(storyId: string) {
         )
       `)
       .eq('id', storyId)
-      .single();
+      .maybeSingle();
     
     if (error) {
       console.error(`[SERVER] Error fetching story details: ${error.message}`, error);
@@ -464,7 +482,7 @@ export async function getStoryById(storyId: string) {
     }
     
     if (!data) {
-      console.error(`[SERVER] No data returned for story ID: ${storyId}`);
+      console.log(`[SERVER] No data returned for story ID: ${storyId}`);
       return null;
     }
     

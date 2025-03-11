@@ -29,30 +29,29 @@ export function DashboardContent({
   const [storyCount, setStoryCount] = useState(initialStoryCount);
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Set mounted after hydration
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-//   const refreshDashboardData = async () => {
-//     console.log('Refreshing dashboard data');
-//     setIsLoading(true);
-//     try {
-//       const recentStories = await getRecentStories(userId);
-//       const count = await getStoryCount(userId);
+  const refreshDashboardData = async () => {
+    setIsLoading(true);
+    setError(null); // Reset error state
+    try {
+      const recentStories = await getRecentStories(userId);
+      const count = await getStoryCount(userId);
       
-//       console.log('userId:', userId);
-//       console.log('Recent stories after refresh:', recentStories);
-      
-//       setStories(recentStories);
-//       setStoryCount(count);
-//     } catch (error) {
-//       console.error("Error refreshing dashboard data:", error);
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   };
+      setStories(recentStories);
+      setStoryCount(Number(count) || 0); // Ensure count is always a number
+    } catch (error) {
+      console.error("Error refreshing dashboard data:", error);
+      setError("Failed to load dashboard data. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Return a loading skeleton during SSR and initial client render
   if (!isMounted) {
@@ -95,10 +94,20 @@ export function DashboardContent({
                 Your personal story library and creation dashboard
               </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshDashboardData}
+              disabled={isLoading}
+              className="border-gray-700 hover:bg-gray-800"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              {isLoading ? 'Refreshing...' : 'Refresh'}
+            </Button>
           </header>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 mt-8">
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
@@ -107,13 +116,31 @@ export function DashboardContent({
               ))}
             </div>
           ) : stories.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
               {stories.map((story) => (
                 <div 
-                  key={story.id}
-                  className="bg-gray-900 rounded-xl p-6 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all"
-                  onClick={() => router.push(`/dashboard/stories/${story.id}`)}
-                >
+                key={story.id}
+                className="bg-gray-900 rounded-xl p-6 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all relative overflow-hidden group"
+              >
+                {/* Add thumbnail if available */}
+                {story.images && story.images[0] && (
+                  <div className="absolute inset-0 opacity-10 group-hover:opacity-15 transition-opacity">
+                    <img 
+                      src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`}
+                      alt=""
+                      className="object-cover w-full h-full"
+                      onError={(e) => {
+                        // Hide image on error
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                
+                <div className="relative z-10" onClick={(e) => {
+                  e.stopPropagation(); // Prevent triggering the parent onClick
+                  router.push(`/dashboard/stories/${story.id}`);
+                }}>
                   <h3 className="text-xl font-semibold text-white mb-2">
                     {story.title}
                   </h3>
@@ -125,7 +152,6 @@ export function DashboardContent({
                        story.language === 'id' ? 'Indonesian' : story.language}
                     </span>
                     <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
-                      {/* Use the client-safe duration component */}
                       <FormattedDuration seconds={story.duration || 0} />
                     </span>
                   </div>
@@ -136,11 +162,16 @@ export function DashboardContent({
                     variant="outline" 
                     size="sm"
                     className="border-gray-700 hover:bg-gray-800"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent triggering the parent onClick
+                      router.push(`/dashboard/stories/${story.id}?autoplay=true`);
+                    }}
                   >
                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                     Listen Now
                   </Button>
                 </div>
+              </div>
               ))}
             </div>
           ) : (

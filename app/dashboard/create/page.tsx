@@ -334,7 +334,7 @@ export default function StoryCreationPage() {
                     <Button 
                       onClick={handleGenerateStory}
                       disabled={formData.isGenerating}
-                      className="bg-indigo-600 hover:bg-indigo-700"
+                      className="text-white bg-indigo-600 hover:bg-indigo-700"
                     >
                       {formData.isGenerating ? (
                         <>
@@ -343,7 +343,7 @@ export default function StoryCreationPage() {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="mr-2 h-4 w-4" />
+                          <Sparkles className="text-white mr-2 h-4 w-4" />
                           Generate Story
                         </>
                       )}

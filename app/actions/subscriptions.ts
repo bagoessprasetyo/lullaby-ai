@@ -3,7 +3,7 @@
 
 import { getAdminClient } from '@/lib/supabase';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from "@/auth.config";;
+import { authOptions } from "@/auth.config";
 import { SubscriptionFeatures } from '@/types/subscription';
 
 export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | null> {

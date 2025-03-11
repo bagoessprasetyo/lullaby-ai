@@ -119,15 +119,15 @@ export function StoryListItem({ story, onToggleFavorite, onDelete }: StoryListIt
       
       <div className="flex gap-2 mt-3 md:mt-0 w-full md:w-auto">
         <Button 
-          className="bg-indigo-600 hover:bg-indigo-700 flex-1 md:flex-auto"
+          className="bg-indigo-600 hover:bg-indigo-700 flex-1 md:flex-auto text-white"
           size="sm"
           onClick={() => router.push(`/dashboard/stories/${story.id}`)}
         >
-          <Play className="h-3.5 w-3.5 mr-1.5" />
+          <Play className="h-3.5 w-3.5 mr-1.5 text-white" />
           Play
         </Button>
         
-        <Button 
+        {/* <Button 
           variant="outline" 
           className="border-gray-700 flex-1 md:flex-auto"
           size="sm"
@@ -135,7 +135,7 @@ export function StoryListItem({ story, onToggleFavorite, onDelete }: StoryListIt
         >
           <Edit className="h-3.5 w-3.5 mr-1.5" />
           Edit
-        </Button>
+        </Button> */}
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -157,14 +157,14 @@ export function StoryListItem({ story, onToggleFavorite, onDelete }: StoryListIt
                 </>
               )}
             </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">
+            {/* <DropdownMenuItem className="cursor-pointer">
               <Share className="h-4 w-4 mr-2" />
               <span>Share Story</span>
             </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer">
               <Download className="h-4 w-4 mr-2" />
               <span>Download</span>
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
             <DropdownMenuItem 
               className="cursor-pointer text-red-400 focus:text-red-400" 
               onClick={onDelete}

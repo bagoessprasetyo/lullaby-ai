@@ -206,13 +206,13 @@ export function LibraryFilters({
             <Button
               type="submit"
               onClick={() => handleSearch()}
-              className="bg-indigo-600 hover:bg-indigo-700 hidden md:flex"
+              className="bg-indigo-600 hover:bg-indigo-700 hidden md:flex text-white"
               disabled={isSearching}
             >
               {isSearching ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-4 w-4 mr-2 animate-spin text-white" />
               ) : (
-                <Search className="h-4 w-4 mr-2" />
+                <Search className="h-4 w-4 mr-2 text-white" />
               )}
               Search
             </Button>

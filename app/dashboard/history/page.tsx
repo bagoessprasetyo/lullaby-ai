@@ -1,6 +1,5 @@
 // Server Component - No "use client" directive
 import { Suspense } from "react";
-import { auth } from "@/auth"; // Using the new Next.js 15 auth pattern
 import { DashboardNavbar } from "@/components/dashboard/navbar";
 import { HistoryPageContent } from "./history-page-content";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -11,7 +10,7 @@ import {
   PlayHistoryEntry
 } from "@/lib/services/history-service";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/auth.config";;
+import { authOptions } from "@/auth.config";
 
 export default async function HistoryPage() {
   // Get the session on the server side
