@@ -3,6 +3,10 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { createApiServices } from "@/lib/api/apiService";
+import { LivePreview } from "./live-preview";
 import {
   ImageIcon,
   Users,
@@ -18,11 +22,7 @@ import { StoryFormData } from "@/app/dashboard/create/page";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { generateStory } from "@/lib/api/storyGeneration";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { createApiServices } from "@/lib/api/apiService";
 
 interface ReviewStepProps {
   formData: StoryFormData;
@@ -40,7 +40,9 @@ export function ReviewStep({
   const router = useRouter();
   const { data: session } = useSession();
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [previewKey, setPreviewKey] = useState(0); // Used to force re-generation of preview
   
+  // Mapping for display purposes
   const durationMap = {
     short: "1 minute",
     medium: "3 minutes",
@@ -62,6 +64,10 @@ export function ReviewStep({
     magical: "Magical"
   };
 
+  const refreshPreview = () => {
+    setPreviewKey(prev => prev + 1);
+  };
+
   const handleGenerateStory = async () => {
     // Reset error state
     setGenerationError(null);
@@ -74,23 +80,8 @@ export function ReviewStep({
         throw new Error("You must be logged in to generate a story");
       }
       
-      // Use async generation for better UX
-      const useAsyncGeneration = true;
-      const apiServices = createApiServices(session);
-      if (useAsyncGeneration) {
-        // Set generating state and let the async component handle the rest
-        onGenerateStory();
-      } else {
-        // Call the API directly (synchronous approach)
-        const result = await apiServices.story.generateStory(formData);
-        
-        if (!result.success) {
-          throw new Error(result.error || "Failed to generate story");
-        }
-        
-        // Redirect to the story view page
-        router.push(`/dashboard/stories/${result.storyId}`);
-      }
+      // Call onGenerateStory to trigger generation in parent component
+      onGenerateStory();
       
     } catch (error) {
       console.error("Story generation error:", error);
@@ -118,137 +109,152 @@ export function ReviewStep({
         </Alert>
       )}
       
-      <Card className="bg-gray-900 border-gray-800 p-6 space-y-6">
-        {/* Photos */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="bg-blue-900/40 rounded-full p-1">
-                <ImageIcon className="h-4 w-4 text-blue-400" />
-              </div>
-              <h4 className="font-medium text-white">Photos</h4>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-gray-400 h-8"
-              onClick={() => router.push("/dashboard/create")}
-            >
-              <PencilIcon className="h-3 w-3 mr-1" />
-              Edit
-            </Button>
-          </div>
-          <div className="grid grid-cols-5 gap-2">
-            {formData.images.map((image, index) => (
-              <div 
-                key={index}
-                className="relative aspect-square rounded-md overflow-hidden border border-gray-800"
-              >
-                <img
-                  src={URL.createObjectURL(image)}
-                  alt={`Story image ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <Separator className="bg-gray-800" />
-        
-        {/* Characters */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="bg-indigo-900/40 rounded-full p-1">
-                <Users className="h-4 w-4 text-indigo-400" />
-              </div>
-              <h4 className="font-medium text-white">Characters</h4>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-gray-400 h-8"
-              onClick={() => router.push("/dashboard/create?step=2")}
-            >
-              <PencilIcon className="h-3 w-3 mr-1" />
-              Edit
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {formData.characters.map((character, index) => (
-              <div key={index} className="bg-gray-800/50 rounded-md p-3">
-                <div className="text-sm text-white font-medium">
-                  {character.name || `Character ${index + 1}`}
-                </div>
-                {character.description && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    {character.description}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Left column: Story details */}
+        <div className="md:col-span-2">
+          <Card className="bg-gray-900 border-gray-800 p-5 space-y-5">
+            {/* Photos */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="bg-blue-900/40 rounded-full p-1">
+                    <ImageIcon className="h-4 w-4 text-blue-400" />
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <Separator className="bg-gray-800" />
-        
-        {/* Story Settings */}
-        <div className="space-y-4">
-          <h4 className="font-medium text-white">Story Settings</h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Duration */}
-            <div className="bg-gray-800/50 rounded-md p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-300">Duration</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-base text-white font-medium">
-                  {durationMap[formData.duration]}
+                  <h4 className="font-medium text-white">Photos</h4>
                 </div>
-                {formData.duration === "long" && !isSubscriber && (
-                  <Badge className="bg-amber-900/60 text-amber-300">
-                    <Lock className="h-3 w-3 mr-1" />
-                    Premium
-                  </Badge>
-                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-gray-400 h-8"
+                  onClick={() => router.push("/dashboard/create")}
+                >
+                  <PencilIcon className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {formData.images.map((image, index) => (
+                  <div 
+                    key={index}
+                    className="relative aspect-square rounded-md overflow-hidden border border-gray-800"
+                  >
+                    <img
+                      src={URL.createObjectURL(image)}
+                      alt={`Story image ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
             
-            {/* Background Music */}
-            <div className="bg-gray-800/50 rounded-md p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <MusicIcon className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-300">Background Music</span>
-              </div>
+            <Separator className="bg-gray-800" />
+            
+            {/* Characters */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="text-base text-white font-medium">
-                  {isSubscriber ? musicMap[formData.backgroundMusic] : "None"}
+                <div className="flex items-center gap-2">
+                  <div className="bg-indigo-900/40 rounded-full p-1">
+                    <Users className="h-4 w-4 text-indigo-400" />
+                  </div>
+                  <h4 className="font-medium text-white">Characters</h4>
                 </div>
-                {!isSubscriber && (
-                  <Badge className="bg-amber-900/60 text-amber-300">
-                    <Lock className="h-3 w-3 mr-1" />
-                    Premium
-                  </Badge>
-                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-gray-400 h-8"
+                  onClick={() => router.push("/dashboard/create?step=1")}
+                >
+                  <PencilIcon className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {formData.characters.map((character, index) => (
+                  <div key={index} className="bg-gray-800/50 rounded-md p-2.5">
+                    <div className="text-sm text-white font-medium">
+                      {character.name || `Character ${index + 1}`}
+                    </div>
+                    {character.description && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        {character.description}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
             
-            {/* Language */}
-            <div className="bg-gray-800/50 rounded-md p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Globe className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-300">Language</span>
-              </div>
-              <div className="text-base text-white font-medium">
-                {languageMap[formData.language]}
+            <Separator className="bg-gray-800" />
+            
+            {/* Story Settings */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-white">Story Settings</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Duration */}
+                <div className="bg-gray-800/50 rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-300">Duration</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-base text-white font-medium">
+                      {durationMap[formData.duration]}
+                    </div>
+                    {formData.duration === "long" && !isSubscriber && (
+                      <Badge className="bg-amber-900/60 text-amber-300">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Premium
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Background Music */}
+                <div className="bg-gray-800/50 rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MusicIcon className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-300">Background Music</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-base text-white font-medium">
+                      {isSubscriber ? musicMap[formData.backgroundMusic] : "None"}
+                    </div>
+                    {!isSubscriber && (
+                      <Badge className="bg-amber-900/60 text-amber-300">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Premium
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Language */}
+                <div className="bg-gray-800/50 rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Globe className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-300">Language</span>
+                  </div>
+                  <div className="text-base text-white font-medium">
+                    {languageMap[formData.language]}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
-      </Card>
+        
+        {/* Right column: Live preview */}
+        <div className="md:col-span-1">
+          <LivePreview 
+            key={previewKey}
+            formData={formData} 
+            className="sticky top-4" 
+            refreshPreview={refreshPreview} 
+          />
+        </div>
+      </div>
       
       {/* Generate Button */}
       <div className="flex flex-col items-center justify-center pt-4">

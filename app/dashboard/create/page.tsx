@@ -10,33 +10,27 @@ import { Card } from "@/components/ui/card";
 import { 
   ImagePlus, 
   Users, 
-  Timer, 
-  Music, 
-  Languages, 
+  Mic, 
   Sparkles, 
   ArrowRight, 
   ArrowLeft,
-  Lock,
-  AlertCircle,
-  Mic
+  AlertCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { UploadStep } from "@/components/story-creation/upload-step";
-import { ThemeSelectionStep } from "@/components/story-creation/theme-selection-step";
-import { CharactersStep } from "@/components/story-creation/characters-step";
-import { DurationStep } from "@/components/story-creation/duration-step";
-import { BackgroundMusicStep } from "@/components/story-creation/background-music-step";
-import { LanguageStep } from "@/components/story-creation/language-step";
-import { VoiceSelectionStep } from "@/components/story-creation/voice-selection-step";
+import { UploadAndThemeStep } from "@/components/story-creation/upload-and-theme-step";
+import { StoryDetailsStep } from "@/components/story-creation/story-details-step";
+import { NarrationSettingsStep } from "@/components/story-creation/narration-settings-step";
+// Import our enhanced review step - we're directly replacing the old one
 import { ReviewStep } from "@/components/story-creation/review-step";
 import { AsyncStoryGenerator } from "@/components/story-creation/async-generator";
 import { useSubscription } from "@/hooks/useSubscription";
+import { QuickStartTemplates } from "@/components/story-creation/quick-start-templates";
 
 // Types for our form data
 export type StoryFormData = {
   images: File[];
   characters: { name: string; description: string }[];
-  theme: string; // New field for theme selection
+  theme: string;
   duration: "short" | "medium" | "long";
   backgroundMusic: string;
   language: string;
@@ -48,7 +42,7 @@ export type StoryFormData = {
 const initialFormData: StoryFormData = {
   images: [],
   characters: [{ name: "", description: "" }],
-  theme: "adventure", // Default theme
+  theme: "adventure",
   duration: "short",
   backgroundMusic: "calming",
   language: "english",
@@ -56,17 +50,32 @@ const initialFormData: StoryFormData = {
   isGenerating: false
 };
 
-// Define steps
+// Define the new streamlined steps
 const steps = [
-  { id: "upload", label: "Upload Photos", icon: <ImagePlus className="h-4 w-4" /> },
-  { id: "theme", label: "Theme", icon: <Sparkles className="h-4 w-4" /> }, // New step
-  { id: "characters", label: "Characters", icon: <Users className="h-4 w-4" /> },
-  { id: "duration", label: "Duration", icon: <Timer className="h-4 w-4" /> },
-  { id: "music", label: "Background Music", icon: <Music className="h-4 w-4" />, 
-    requiresSubscription: true },
-  { id: "language", label: "Language", icon: <Languages className="h-4 w-4" /> },
-  { id: "voice", label: "Voice", icon: <Mic className="h-4 w-4" /> },
-  { id: "review", label: "Review & Create", icon: <Sparkles className="h-4 w-4" /> }
+  { 
+    id: "upload-theme", 
+    label: "Upload & Theme", 
+    icon: <ImagePlus className="h-4 w-4" />,
+    description: "Upload photos and select a theme"
+  },
+  { 
+    id: "story-details", 
+    label: "Story Details", 
+    icon: <Users className="h-4 w-4" />,
+    description: "Define characters and story length"
+  },
+  { 
+    id: "narration", 
+    label: "Narration Settings", 
+    icon: <Mic className="h-4 w-4" />,
+    description: "Choose language, voice, and music"
+  },
+  { 
+    id: "review", 
+    label: "Review & Create", 
+    icon: <Sparkles className="h-4 w-4" />,
+    description: "Review your story and generate"
+  }
 ];
 
 export default function StoryCreationPage() {
@@ -78,89 +87,24 @@ export default function StoryCreationPage() {
   
   // Use our subscription hook that uses server action
   const { features, isSubscriber, isLoading: subscriptionLoading } = useSubscription();
-  console.log('freature', features);
-  // const validateStep = () => {
-  //   const newErrors: { [key: string]: string } = {};
-    
-  //   switch (currentStep) {
-  //     case 0: // Upload Photos
-  //       if (formData.images.length === 0) {
-  //         newErrors.images = "Please upload at least one image";
-  //       } else if (formData.images.length > 5) {
-  //         newErrors.images = "Maximum 5 images allowed";
-  //       }
-  //       break;
-        
-  //     case 1: // Theme Selection
-  //       if (!formData.theme) {
-  //         newErrors.theme = "Please select a theme for your story";
-  //       }
-        
-  //       // Check if premium features are restricted
-  //       if (features && 
-  //           (formData.theme === "educational" || formData.theme === "customized") && 
-  //           !features.features.educational_themes) {
-  //         newErrors.theme = "Educational and customized themes require a premium subscription";
-  //       }
-  //       break;
-        
-  //     case 2: // Characters
-  //       const emptyCharacters = formData.characters.filter(
-  //         (character) => character.name.trim() === ""
-  //       );
-  //       if (emptyCharacters.length > 0) {
-  //         newErrors.characters = "Please fill in all character names";
-  //       }
-  //       break;
-        
-  //     case 3: // Duration
-  //       if (features && 
-  //           formData.duration === "long" && 
-  //           !features.features.long_stories) {
-  //         newErrors.duration = "Long stories are available for subscribers only";
-  //       }
-  //       break;
-        
-  //     case 4: // Background Music
-  //       if (features && 
-  //           formData.backgroundMusic && 
-  //           !features.features.background_music) {
-  //         newErrors.backgroundMusic = "Background music requires a premium subscription";
-  //       }
-  //       // break;
-        
-  //     case 6: // Voice
-  //       // Check if custom voices are allowed
-  //       if (features && 
-  //           formData.voice && 
-  //           formData.voice.startsWith("custom-") && 
-  //           !features.features.custom_voices) {
-  //         newErrors.voice = "Custom voices require a premium subscription";
-  //       }
-  //       break;
-  //   }
-    
-  //   setErrors(newErrors);
-  //   return Object.keys(newErrors).length === 0;
-  // };
+  
+  // Simplified validation that handles all fields in each step
   const validateStep = () => {
     const newErrors: { [key: string]: string } = {};
     
     switch (currentStep) {
-      case 0: // Upload Photos
+      case 0: // Upload & Theme
         if (formData.images.length === 0) {
           newErrors.images = "Please upload at least one image";
         } else if (formData.images.length > 5) {
           newErrors.images = "Maximum 5 images allowed";
         }
-        break;
         
-      case 1: // Theme Selection
         if (!formData.theme) {
           newErrors.theme = "Please select a theme for your story";
         }
         
-        // Check if premium features are restricted
+        // Check premium themes
         if (features && 
             (formData.theme === "educational" || formData.theme === "customized") && 
             !features.features.educational_themes) {
@@ -168,16 +112,14 @@ export default function StoryCreationPage() {
         }
         break;
         
-      case 2: // Characters
+      case 1: // Story Details (Characters & Duration)
         const emptyCharacters = formData.characters.filter(
           (character) => character.name.trim() === ""
         );
         if (emptyCharacters.length > 0) {
           newErrors.characters = "Please fill in all character names";
         }
-        break;
         
-      case 3: // Duration
         if (features && 
             formData.duration === "long" && 
             !features.features.long_stories) {
@@ -185,20 +127,13 @@ export default function StoryCreationPage() {
         }
         break;
         
-      case 4: // Background Music
-        // if (features && 
-        //     formData.backgroundMusic && 
-        //     !features.features.background_music) {
-        //   newErrors.backgroundMusic = "Background music requires a premium subscription";
-        // }
-        // break; // THIS WAS COMMENTED OUT - UNCOMMENT IT
+      case 2: // Narration Settings (Language, Voice, Music)
+        if (features && 
+            formData.backgroundMusic && 
+            !features.features.background_music) {
+          newErrors.backgroundMusic = "Background music requires a premium subscription";
+        }
         
-      case 5: // Language
-        // Add any language validation if needed
-        break;
-        
-      case 6: // Voice
-        // Check if custom voices are allowed
         if (features && 
             formData.voice && 
             formData.voice.startsWith("custom-") && 
@@ -211,21 +146,11 @@ export default function StoryCreationPage() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  const handleNext = () => {
-    logStepChange('forward');
-    if (validateStep()) {
-      setCurrentStep((prev) => {
-        const newStep = Math.min(prev + 1, steps.length - 1);
-        console.log(`Moving to step ${newStep}`);
-        return newStep;
-      });
-    }
-  };
 
-  const logStepChange = (direction: string) => {
-    console.log(`Attempting to move ${direction} from step ${currentStep}`);
-    console.log(`Validation result:`, validateStep());
-    console.log(`Errors:`, errors);
+  const handleNext = () => {
+    if (validateStep()) {
+      setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+    }
   };
 
   const handlePrevious = () => {
@@ -262,15 +187,28 @@ export default function StoryCreationPage() {
     );
   }
 
+  // Determine step progress percentage
+  const progressPercentage = ((currentStep + 1) / steps.length) * 100;
+
   return (
     <>
       <DashboardNavbar />
       <div className="container max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Create a Story</h1>
-          <p className="text-gray-400">
-            Transform your photos into magical bedtime stories
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Create a Story</h1>
+            <p className="text-gray-400">
+              Transform your photos into magical bedtime stories
+            </p>
+          </div>
+          
+          <div className="mt-4 md:mt-0">
+            <QuickStartTemplates 
+              updateFormData={updateFormData}
+              setFormData={setFormData}
+              initialFormData={initialFormData}
+            />
+          </div>
         </div>
         
         {!formData.isGenerating && (
@@ -278,8 +216,9 @@ export default function StoryCreationPage() {
             {/* Progress Indicators */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm text-gray-400">
-                  Step {currentStep + 1} of {steps.length}
+                <div className="text-sm text-gray-400 flex items-center gap-2">
+                  <span className="font-medium text-white">{steps[currentStep].label}</span>
+                  <span>• {Math.round(progressPercentage)}% complete</span>
                 </div>
                 {!isSubscriber && (
                   <div className="flex items-center gap-1 text-xs text-amber-400">
@@ -289,14 +228,19 @@ export default function StoryCreationPage() {
                 )}
               </div>
               
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full h-1 bg-gray-800 rounded-full"></div>
-                </div>
-                <div className="relative flex justify-between">
-                  {steps.map((step, index) => (
+              {/* Progress bar */}
+              <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-indigo-600 rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
+              
+              {/* Step circles */}
+              <div className="relative flex justify-between mt-2">
+                {steps.map((step, index) => (
+                  <div key={step.id} className="flex flex-col items-center">
                     <div 
-                      key={step.id} 
                       className={cn(
                         "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all",
                         currentStep === index 
@@ -306,14 +250,13 @@ export default function StoryCreationPage() {
                           : "border-gray-700 bg-gray-800 text-gray-500"
                       )}
                     >
-                      {step.requiresSubscription && !isSubscriber ? (
-                        <Lock className="h-3 w-3" />
-                      ) : (
-                        step.icon
-                      )}
+                      {step.icon}
                     </div>
-                  ))}
-                </div>
+                    <span className="text-xs mt-1 text-gray-400 hidden md:block">
+                      {step.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </>
@@ -331,15 +274,16 @@ export default function StoryCreationPage() {
                 {/* Step Content */}
                 <div className="min-h-[400px]">
                   {currentStep === 0 && (
-                    <UploadStep 
+                    <UploadAndThemeStep 
                       formData={formData}
                       updateFormData={updateFormData}
                       errors={errors}
+                      isSubscriber={isSubscriber}
                     />
                   )}
                   
                   {currentStep === 1 && (
-                    <ThemeSelectionStep 
+                    <StoryDetailsStep 
                       formData={formData}
                       updateFormData={updateFormData}
                       errors={errors}
@@ -348,49 +292,15 @@ export default function StoryCreationPage() {
                   )}
                   
                   {currentStep === 2 && (
-                    <CharactersStep 
+                    <NarrationSettingsStep 
                       formData={formData}
                       updateFormData={updateFormData}
                       errors={errors}
+                      isSubscriber={isSubscriber}
                     />
                   )}
                   
                   {currentStep === 3 && (
-                    <DurationStep 
-                      formData={formData}
-                      updateFormData={updateFormData}
-                      errors={errors}
-                      isSubscriber={isSubscriber}
-                    />
-                  )}
-                  
-                  {currentStep === 4 && (
-                    <BackgroundMusicStep 
-                      formData={formData}
-                      updateFormData={updateFormData}
-                      errors={errors}
-                      isSubscriber={isSubscriber}
-                    />
-                  )}
-                  
-                  {currentStep === 5 && (
-                    <LanguageStep 
-                      formData={formData}
-                      updateFormData={updateFormData}
-                      errors={errors}
-                    />
-                  )}
-                  
-                  {currentStep === 6 && (
-                    <VoiceSelectionStep 
-                      formData={formData}
-                      updateFormData={updateFormData}
-                      errors={errors}
-                      isSubscriber={isSubscriber}
-                    />
-                  )}
-                  
-                  {currentStep === 7 && (
                     <ReviewStep 
                       formData={formData}
                       updateFormData={updateFormData}

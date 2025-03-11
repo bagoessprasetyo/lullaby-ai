@@ -15,13 +15,12 @@ import {
   Download, 
   ChevronLeft,
   Trash2,
-  AlertCircle
+  Sparkles
 } from "lucide-react";
 import Link from "next/link";
 import { formatDuration } from "@/lib/format-duration";
 import { Story } from "@/types/story";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import {
   AlertDialog,
@@ -33,8 +32,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { createApiServices } from "@/lib/api/apiService";
 import { useToast } from "@/components/ui/use-toast";
+import { StoryPlayer } from "@/components/story-playback/story-player";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { supabase, getAdminClient } from "@/lib/supabase";
 
 export default function StoryPage() {
   const { id } = useParams() as { id: string };
@@ -54,25 +59,35 @@ export default function StoryPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
-  const apiServices = createApiServices(session);
   
   // Record play progress every 10 seconds
   useEffect(() => {
     let recordInterval: NodeJS.Timeout;
     
-    if (isPlaying && story) {
-      recordInterval = setInterval(() => {
+    if (isPlaying && story && session?.user?.id) {
+      recordInterval = setInterval(async () => {
         const progressPercentage = Math.round((currentTime / duration) * 100);
         
         // Only record if significant progress has been made
         if (currentTime - playedTime > 10) {
-          apiServices.story.recordPlay(id, false, progressPercentage)
-            .then(() => {
-              setPlayedTime(currentTime);
-            })
-            .catch(error => {
-              console.error("Error recording play progress:", error);
-            });
+          try {
+            // Use Supabase to record play progress
+            const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+            
+            await client
+              .from('play_history')
+              .insert({
+                user_id: session.user.id,
+                story_id: id,
+                played_at: new Date().toISOString(),
+                completed: false,
+                progress_percentage: progressPercentage
+              });
+              
+            setPlayedTime(currentTime);
+          } catch (error) {
+            console.error("Error recording play progress:", error);
+          }
         }
       }, 10000); // Record every 10 seconds
     }
@@ -80,35 +95,74 @@ export default function StoryPage() {
     return () => {
       if (recordInterval) clearInterval(recordInterval);
     };
-  }, [isPlaying, currentTime, duration, playedTime, id, story, apiServices.story]);
+  }, [isPlaying, currentTime, duration, playedTime, id, story, session?.user?.id]);
   
-  // Fetch story data
+  // Fetch story data directly from Supabase
   useEffect(() => {
     const fetchStory = async () => {
+      if (!session?.user?.id) return;
+      
       try {
         setIsLoading(true);
         setLoadError(null);
         
-        const response = await apiServices.story.getStory(id);
+        // Use Supabase client to fetch story data
+        const client = typeof window === 'undefined' ? getAdminClient() : supabase;
         
-        if (response.success && response.story) {
-          setStory(response.story);
-          setIsFavorite(response.story.is_favorite || false);
-        } else {
-          setLoadError("Failed to load story");
+        // Fetch the story with related data
+        const { data, error } = await client
+          .from('stories')
+          .select(`
+            *,
+            images(id, storage_path, sequence_index),
+            characters(id, name, description),
+            background_music:background_music_id(
+              id, 
+              name, 
+              storage_path, 
+              category
+            )
+          `)
+          .eq('id', id)
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (error) {
+          console.error("Error fetching story:", error);
+          setLoadError("Failed to load story. Please try again later.");
+          return;
         }
+        
+        if (!data) {
+          setLoadError("Story not found");
+          return;
+        }
+        
+        // Sort images by sequence_index if available
+        if (data.images && Array.isArray(data.images)) {
+          data.images.sort((a: any, b: any) => 
+            (a.sequence_index || 0) - (b.sequence_index || 0)
+          );
+        }
+        
+        // Convert Supabase data to Story type
+        const storyData: Story = {
+          ...data,
+          is_favorite: data.is_favorite || false,
+        };
+        
+        setStory(storyData);
+        setIsFavorite(storyData.is_favorite);
       } catch (error) {
-        console.error("Error fetching story:", error);
-        setLoadError("Failed to load story. Please try again later.");
+        console.error("Error in fetchStory:", error);
+        setLoadError("An unexpected error occurred. Please try again later.");
       } finally {
         setIsLoading(false);
       }
     };
     
-    if (session) {
-      fetchStory();
-    }
-  }, [id, session, apiServices.story]);
+    fetchStory();
+  }, [id, session]);
   
   const togglePlayPause = () => {
     if (audioRef.current) {
@@ -129,20 +183,33 @@ export default function StoryPage() {
   };
   
   const toggleFavorite = async () => {
+    if (!session?.user?.id || !story) return;
+    
     try {
-      const response = await apiServices.story.toggleFavorite(id, !isFavorite);
+      // Use Supabase to toggle favorite status
+      const client = typeof window === 'undefined' ? getAdminClient() : supabase;
       
-      if (response.success) {
-        setIsFavorite(response.isFavorite);
-        
-        toast({
-          title: response.isFavorite ? "Added to Favorites" : "Removed from Favorites",
-          description: response.isFavorite 
-            ? "Story has been added to your favorites" 
-            : "Story has been removed from your favorites",
-          variant: "default"
-        });
+      const { data, error } = await client
+        .from('stories')
+        .update({ is_favorite: !isFavorite })
+        .eq('id', id)
+        .eq('user_id', session.user.id)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
       }
+      
+      setIsFavorite(!isFavorite);
+      
+      toast({
+        title: !isFavorite ? "Added to Favorites" : "Removed from Favorites",
+        description: !isFavorite 
+          ? "Story has been added to your favorites" 
+          : "Story has been removed from your favorites",
+        variant: "default"
+      });
     } catch (error) {
       console.error("Error toggling favorite:", error);
       toast({
@@ -165,15 +232,28 @@ export default function StoryPage() {
     }
   };
   
-  const handleEnded = () => {
+  const handleEnded = async () => {
     setIsPlaying(false);
     setCurrentTime(0);
     
-    // Record completed play
-    apiServices.story.recordPlay(id, true, 100)
-      .catch(error => {
-        console.error("Error recording completed play:", error);
-      });
+    if (!session?.user?.id) return;
+    
+    try {
+      // Record completed play using Supabase
+      const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+      
+      await client
+        .from('play_history')
+        .insert({
+          user_id: session.user.id,
+          story_id: id,
+          played_at: new Date().toISOString(),
+          completed: true,
+          progress_percentage: 100
+        });
+    } catch (error) {
+      console.error("Error recording completed play:", error);
+    }
   };
   
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -190,23 +270,32 @@ export default function StoryPage() {
   };
   
   const handleDeleteStory = async () => {
+    if (!session?.user?.id) return;
+    
     try {
       setIsDeleting(true);
       
-      const response = await apiServices.story.deleteStory(id);
+      // Use Supabase to delete the story
+      const client = typeof window === 'undefined' ? getAdminClient() : supabase;
       
-      if (response.success) {
-        toast({
-          title: "Story Deleted",
-          description: "The story has been permanently deleted",
-          variant: "default"
-        });
-        
-        // Redirect to stories list
-        router.push("/dashboard/stories");
-      } else {
-        throw new Error("Failed to delete story");
+      const { error } = await client
+        .from('stories')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', session.user.id);
+      
+      if (error) {
+        throw error;
       }
+      
+      toast({
+        title: "Story Deleted",
+        description: "The story has been permanently deleted",
+        variant: "default"
+      });
+      
+      // Redirect to stories list
+      router.push("/dashboard/library");
     } catch (error) {
       console.error("Error deleting story:", error);
       toast({
@@ -224,7 +313,7 @@ export default function StoryPage() {
     if (!story) return;
     
     try {
-      // For now, we'll just copy the URL to clipboard
+      // Copy URL to clipboard
       await navigator.clipboard.writeText(window.location.href);
       
       toast({
@@ -253,6 +342,73 @@ export default function StoryPage() {
     link.click();
     document.body.removeChild(link);
   };
+  
+  // Convert the story to the format expected by StoryPlayer
+  // Find this function in your code and replace it with this version:
+// In your StoryPage component, replace the convertToStoryPlayerFormat function with this:
+const convertToStoryPlayerFormat = () => {
+  if (!story) return null;
+  
+  // Convert images to pages with text content
+  const storyText = story.text_content || '';
+  const paragraphs = storyText.split('\n\n').filter(p => p.trim() !== '');
+  
+  // Create pages by pairing images with paragraphs of text
+  const pages = [];
+  const images = story.images || [];
+  
+  // If there are more paragraphs than images, we'll spread them out
+  const textPerImage = Math.max(1, Math.ceil(paragraphs.length / Math.max(1, images.length)));
+  
+  for (let i = 0; i < images.length; i++) {
+    const startIdx = i * textPerImage;
+    const endIdx = Math.min(startIdx + textPerImage, paragraphs.length);
+    const pageText = paragraphs.slice(startIdx, endIdx).join('\n\n');
+    
+    pages.push({
+      id: `page-${i + 1}`,
+      text: pageText || "Enjoy this moment in the story...",
+      imageUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${images[i].storage_path}`,
+      audioUrl: story.audio_url || undefined
+    });
+  }
+  
+  // If there are paragraphs left over, add them to the last page
+  if (paragraphs.length > images.length * textPerImage && pages.length > 0) {
+    const remainingText = paragraphs.slice(images.length * textPerImage).join('\n\n');
+    pages[pages.length - 1].text += '\n\n' + remainingText;
+  }
+  
+  // If there are no images, create pages from text only
+  if (pages.length === 0 && paragraphs.length > 0) {
+    const pageSize = 3; // Number of paragraphs per page
+    for (let i = 0; i < paragraphs.length; i += pageSize) {
+      pages.push({
+        id: `page-${i / pageSize + 1}`,
+        text: paragraphs.slice(i, i + pageSize).join('\n\n'),
+        audioUrl: story.audio_url || undefined
+      });
+    }
+  }
+  
+  // Create the base storyPlayerData without potentially problematic properties
+  const storyPlayerData: any = {
+    id: story.id,
+    title: story.title,
+    pages,
+    theme: (story.theme as any) || "adventure",
+    language: story.language || "english"
+  };
+  
+  // Only add backgroundMusicUrl if we have valid data
+  // @ts-ignore - accessing the joined background_music data from Supabase
+  if (story.background_music && story.background_music.storage_path) {
+    // @ts-ignore
+    storyPlayerData.backgroundMusicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.background_music.storage_path}`;
+  }
+  
+  return storyPlayerData;
+};
   
   if (isLoading) {
     return (
@@ -285,6 +441,8 @@ export default function StoryPage() {
       </>
     );
   }
+  
+  const storyPlayerData = convertToStoryPlayerFormat();
   
   return (
     <>
@@ -325,6 +483,36 @@ export default function StoryPage() {
             </Badge>
           </div>
         </div>
+        
+        {/* Enhanced Reading Experience - New Button */}
+        <Card className="bg-gradient-to-r from-indigo-900/60 to-purple-900/60 border-gray-800 mb-8 p-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('/backgrounds/sparkles.svg')] bg-repeat opacity-10 animate-pulse"></div>
+          <div className="relative z-10 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-2">Immersive Reading Experience</h3>
+              <p className="text-gray-300 max-w-md">
+                Experience this story with background effects, smooth transitions, and enhanced audio controls.
+              </p>
+            </div>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Start Immersive Mode
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-6xl p-0 bg-transparent border-0">
+                {storyPlayerData && (
+                  <StoryPlayer 
+                    story={storyPlayerData} 
+                    onClose={() => document.getElementById('close-dialog-button')?.click()}
+                  />
+                )}
+                <button id="close-dialog-button" className="hidden" />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </Card>
         
         {/* Story Images */}
         {story.images && story.images.length > 0 && (
