@@ -1,60 +1,72 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { PlusCircle, Clock, Book, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
-import { getRecentStories, getStoryCount, Story } from "@/lib/services/story-service";
 import { ClientDate } from "@/components/client-date";
 import { FormattedDuration } from "../formatted-date";
+import { useRecentStories, useStoryCount } from "@/hooks/query/useStories";
 
 interface DashboardContentProps {
-  initialStories: Story[];
-  initialStoryCount: number;
   userName: string;
-  userId: string;
 }
 
 export function DashboardContent({ 
-  initialStories, 
-  initialStoryCount, 
-  userName,
-  userId
+  userName
 }: DashboardContentProps) {
   const router = useRouter();
-  const [stories, setStories] = useState<Story[]>(initialStories);
-  const [storyCount, setStoryCount] = useState(initialStoryCount);
-  const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  
+  console.log("DashboardContent rendering");
+  
+  // Fetch stories using React Query - no userId needed now
+  const { 
+    data: stories = [], 
+    isLoading: isLoadingStories,
+    isError: hasStoriesError, 
+    error: storiesError,
+    refetch: refetchStories
+  } = useRecentStories();
+  
+  // Fetch story count using React Query - no userId needed now
+  const { 
+    data: storyCount = 0, 
+    isLoading: isLoadingCount,
+    refetch: refetchCount
+  } = useStoryCount();
 
   // Set mounted after hydration
   useEffect(() => {
+    console.log("DashboardContent mounting, setting isMounted to true");
     setIsMounted(true);
-  }, []);
+    
+    // Log query results after mounting
+    console.log("Stories data after mount:", stories);
+    console.log("Story count after mount:", storyCount);
+    console.log("Loading states - stories:", isLoadingStories, "count:", isLoadingCount);
+    
+    if (hasStoriesError) {
+      console.error("Stories error:", storiesError);
+    }
+  }, [stories, storyCount, isLoadingStories, isLoadingCount, hasStoriesError, storiesError]);
 
   const refreshDashboardData = async () => {
-    setIsLoading(true);
-    setError(null); // Reset error state
-    try {
-      const recentStories = await getRecentStories(userId);
-      const count = await getStoryCount(userId);
-      
-      setStories(recentStories);
-      setStoryCount(Number(count) || 0); // Ensure count is always a number
-    } catch (error) {
-      console.error("Error refreshing dashboard data:", error);
-      setError("Failed to load dashboard data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    console.log("Manually refreshing dashboard data");
+    // Refetch data using React Query's refetch
+    await Promise.all([
+      refetchStories(),
+      refetchCount()
+    ]);
+    console.log("Refresh complete");
   };
 
   // Return a loading skeleton during SSR and initial client render
-  if (!isMounted) {
+  if (!isMounted || isLoadingStories || isLoadingCount) {
+    console.log("Rendering loading state");
     return (
       <>
         <DashboardNavbar />
@@ -76,6 +88,31 @@ export function DashboardContent({
     );
   }
 
+  // Handle error state
+  if (hasStoriesError) {
+    console.log("Rendering error state:", storiesError);
+    return (
+      <>
+        <DashboardNavbar />
+        <div className="container max-w-6xl mx-auto px-4 py-8">
+          <div className="p-8 text-center">
+            <h2 className="text-xl font-semibold mb-2 text-white">
+              Error Loading Dashboard
+            </h2>
+            <p className="text-gray-400 mb-4">
+              {storiesError instanceof Error ? storiesError.message : "Failed to load your stories."}
+            </p>
+            <Button onClick={refreshDashboardData}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Try Again
+            </Button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  console.log("Rendering dashboard with stories:", stories.length);
+  
   return (
     <>
       <DashboardNavbar />
@@ -98,26 +135,17 @@ export function DashboardContent({
               variant="outline"
               size="sm"
               onClick={refreshDashboardData}
-              disabled={isLoading}
+              disabled={isLoadingStories || isLoadingCount}
               className="border-gray-700 hover:bg-gray-800"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Refreshing...' : 'Refresh'}
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingStories || isLoadingCount ? 'animate-spin' : ''}`} />
+              {isLoadingStories || isLoadingCount ? 'Refreshing...' : 'Refresh'}
             </Button>
           </header>
 
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 mt-8">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="bg-gray-900 rounded-xl p-6 h-64 animate-pulse"
-                ></div>
-              ))}
-            </div>
-          ) : stories.length > 0 ? (
+          {stories.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
-              {stories.map((story) => (
+              {stories.map((story: { id: Key | null | undefined; images: { storage_path: any; }[]; title: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; language: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; duration: any; created_at: string | Date; }) => (
                 <div 
                 key={story.id}
                 className="bg-gray-900 rounded-xl p-6 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all relative overflow-hidden group"
@@ -201,7 +229,7 @@ export function DashboardContent({
               Recent Activity
             </h2>
             <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4">
-              {isLoading ? (
+              {isLoadingStories || isLoadingCount ? (
                 <div className="h-32 animate-pulse bg-gray-800 rounded-lg"></div>
               ) : storyCount > 0 ? (
                 <div className="text-center py-4">

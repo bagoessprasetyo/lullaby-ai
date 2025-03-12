@@ -214,7 +214,8 @@ export async function getStoriesWithFilters(
 
 // Toggle favorite status
 export async function toggleStoryFavorite(storyId: string, isFavorite: boolean) {
-  const { data, error } = await supabase
+  const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+  const { data, error } = await client
     .from('stories')
     .update({ is_favorite: isFavorite })
     .eq('id', storyId)
@@ -233,7 +234,8 @@ export async function toggleStoryFavorite(storyId: string, isFavorite: boolean) 
 export async function deleteStory(storyId: string) {
   // First delete associated images and other related data (handled by ON DELETE CASCADE)
   // Then delete the story
-  const { error } = await supabase
+  const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+  const { error } = await client
     .from('stories')
     .delete()
     .eq('id', storyId);
@@ -264,27 +266,36 @@ export function normalizeUserId(userId: string | number | undefined): string {
   return idString;
 }
 export async function getRecentStories(userId: string, limit = 3) {
-  console.log("[SERVER] Fetching stories for user:", userId);
+  console.log("[SERVICE] Fetching stories for user:", userId, "with limit:", limit);
   
   if (!userId) {
-    console.error("[SERVER] No userId provided");
+    console.error("[SERVICE] No userId provided to getRecentStories");
     return [];
   }
 
   try {
-    // Use the admin client for server-side operations (bypasses RLS)
-    // Only do this for server components - check if we're on the server
-    const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+    // Always use the admin client to bypass RLS issues
+    // const client = getAdminClient();
+    let client;
+    try {
+      client = getAdminClient();
+      console.log("[SERVICE] Using admin client");
+    } catch (error) {
+      console.warn("[SERVICE] Admin client not available, falling back to browser client");
+      client = supabase;
+    }
+    // console.log("[SERVICE] Using admin client to bypass RLS");
     
     // Direct query with logging
+    console.log("[SERVICE] Executing query: stories.select().eq('user_id', userId).order('created_at', { ascending: false }).limit(limit)");
     const { data, error } = await client
-      .from('stories')
-      .select('*')
+      .from('public.stories')
+      .select('*, images(storage_path, sequence_index)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
     
-    console.log("[SERVER] Stories query result:", { 
+    console.log("[SERVICE] Stories query result:", { 
       userId,
       success: !error, 
       count: data?.length,
@@ -292,138 +303,63 @@ export async function getRecentStories(userId: string, limit = 3) {
     });
     
     if (error) {
-      console.error("[SERVER] Error fetching recent stories:", error.message, error.details);
+      console.error("[SERVICE] Error fetching recent stories:", error.message, error.details);
       return [];
     }
     
     return data || [];
   } catch (e) {
-    console.error("[SERVER] Exception in getRecentStories:", e);
+    console.error("[SERVICE] Exception in getRecentStories:", e);
     return [];
   }
 }
-// export async function getRecentStories(userId: string, limit = 3) {
-//   console.log("[SERVER] Fetching stories for user:", userId);
-//   console.log("[SERVER] Normalize user id :", normalizeUserId(userId));
-  
-//   const normalizedId = normalizeUserId(userId);
-
-//   if (!userId) {
-//     console.error("[SERVER] No userId provided");
-//     return [];
-//   }
-
-//   try {
-//     // Direct query with logging
-//     const { data, error } = await supabase
-//       .from('stories')
-//       .select('*')
-//       .eq('user_id', normalizedId)
-//       .order('created_at', { ascending: false })
-//       .limit(limit);
-    
-//     // Detailed logging for debugging
-//     console.log("[SERVER] Stories query result:", { 
-//       userId,
-//       success: !error, 
-//       count: data?.length,
-//       data: data?.map(d => ({ id: d.id, title: d.title })) // Log just essential info
-//     });
-    
-//     if (error) {
-//       console.error("[SERVER] Error fetching recent stories:", error.message, error.details);
-//       return [];
-//     }
-    
-//     return data || [];
-//   } catch (e) {
-//     console.error("[SERVER] Exception in getRecentStories:", e);
-//     return [];
-//   }
-// }
-// export async function getRecentStories(userId: string, limit = 3) {
-//   console.log("Fetching stories for user:", userId); // Log the userId to verify
-  
-//   if (!userId) {
-//     console.error("No userId provided");
-//     return [];
-//   }
-
-//   try {
-//     // First, check if the user exists to confirm the ID is valid
-//     const { data: userExists, error: userError } = await supabase
-//       .from('profiles')
-//       .select('id')
-//       .eq('id', userId);
-    
-//     if (userError || !userExists) {
-//       console.error("User validation error:", userError);
-//       console.log("User exists check:", userExists);
-//     }
-
-//     // Now query for stories
-//     const { data, error } = await supabase
-//       .from('stories')
-//       .select('*')
-//       .eq('user_id', userId)
-//       .order('created_at', { ascending: false })
-//       .limit(limit);
-
-//       console.log("Fetching stories for user 2:", userId);
-
-//       console.log('Recent Story Result:', { data, error, count: data?.length });
-    
-//     if (error) {
-//       console.error("Error fetching recent stories:", error);
-//       return [];
-//     }
-    
-//     if (!data || data.length === 0) {
-//       console.log("No stories found for user:", userId);
-//     }
-    
-//     return data || [];
-//   } catch (e) {
-//     console.error("Exception in getRecentStories:", e);
-//     return [];
-//   }
-// }
 
 export async function getStoryCount(userId: string) {
+  console.log("[SERVICE] Fetching story count for user:", userId);
 
   if (!userId) {
-    console.error("[SERVER] No userId provided");
-    return [];
+    console.error("[SERVICE] No userId provided to getStoryCount");
+    return 0;
   }
 
   try {
-    // Use the admin client for server-side operations (bypasses RLS)
-    // Only do this for server components - check if we're on the server
-    const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+    // Always use the admin client to bypass RLS issues
+    // const client = getAdminClient();
+    let client;
+    try {
+      client = getAdminClient();
+      console.log("[SERVICE] Using admin client");
+    } catch (error) {
+      console.warn("[SERVICE] Admin client not available, falling back to browser client");
+      client = supabase;
+    }
+    // console.log("[SERVICE] Using admin client to bypass RLS");
     
     // Direct query with logging
+    console.log("[SERVICE] Executing count query for stories.select('*', {count: 'exact'}).eq('user_id', userId)");
     const { count, error } = await client
-    .from('stories')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId);
+      .from('stories')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
     
-    console.log("[SERVER] Stories query count result:", { 
+    console.log("[SERVICE] Story count query result:", { 
       userId,
       success: !error, 
       count: count,
     });
     
     if (error) {
-      console.error("[SERVER] Error fetching recent stories:", error.message, error.details);
-      return [];
+      console.error("[SERVICE] Error fetching story count:", error.message, error.details);
+      return 0;
     }
     
     return count || 0;
   } catch (e) {
-    console.error("[SERVER] Exception in getRecentStories:", e);
+    console.error("[SERVICE] Exception in getStoryCount:", e);
     return 0;
   }
 }
+
 
 // Add this to your existing story-service.ts
 export async function getStoryById(storyId: string) {
@@ -513,7 +449,8 @@ export async function getStoryById(storyId: string) {
 }
 
 export async function getFavoriteStories(userId: string, limit = 3) {
-  const { data, error } = await supabase
+  const client = typeof window === 'undefined' ? getAdminClient() : supabase;
+  const { data, error } = await client
     .from('stories')
     .select('*')
     .eq('user_id', userId)

@@ -1,39 +1,35 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+// app/layout.tsx
+import './globals.css'
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import { AuthProvider } from "@/components/AuthProvider";
-import { UpgradeModalProvider } from "@/components/upgrade-modal-providers";
-import { Analytics } from "@vercel/analytics/react"
+import { QueryProvider } from "@/lib/providers/query-provider";
+// import { Toaster } from "@/components/ui/toaster";
 
-// Use Inter as a fallback font that works reliably with Next.js
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-  display: "swap",
-});
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: "Lullaby AI - Bedtime Stories from Your Photos",
-  description: "Transform cherished moments into magical bedtime stories powered by AI",
-};
+  title: 'Lullaby.ai - Personalized Bedtime Stories',
+  description: 'Create personalized bedtime stories for your children with AI',
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} dark bg-black antialiased`}
+        className={`${inter} dark bg-black antialiased`}
       >
-        <UpgradeModalProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <QueryProvider>
             {children}
-            {/* <Analytics/> */}
-          </AuthProvider>
-        </UpgradeModalProvider>
+            {/* <Toaster /> */}
+          </QueryProvider>
+        </AuthProvider>
       </body>
     </html>
-  );
+  )
 }

@@ -1,50 +1,37 @@
 "use client";
 
-import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useSubscription } from '@/hooks/useSubscription';
-import { getStoryCount } from '@/lib/services/story-service';
+import { useSubscriptionFeatures } from '@/hooks/query/useSubscription';
+import { useStoryCount } from '@/hooks/query/useStories';
 
 export function useSubscriptionLimits() {
   const { data: session } = useSession();
-  const { features, isLoading: isLoadingSubscription } = useSubscription();
-  const [storyCount, setStoryCount] = useState<number | null>(null);
-  const [isLoadingCounts, setIsLoadingCounts] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   
-  useEffect(() => {
-    const fetchCounts = async () => {
-      if (!session?.user?.id) return;
-      
-      try {
-        setIsLoadingCounts(true);
-        const count = await getStoryCount(session.user.id);
-        // Ensure count is a number before setting state
-        setStoryCount(typeof count === 'number' ? count : 0);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching story count:", err);
-        setError(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        setIsLoadingCounts(false);
-      }
-    };
-    
-    fetchCounts();
-  }, [session?.user?.id]);
+  // Use React Query hooks
+  const { 
+    data: features,
+    isLoading: isLoadingSubscription,
+    error: subscriptionError
+  } = useSubscriptionFeatures();
+  
+  const {
+    data: storyCount = 0,
+    isLoading: isLoadingCount,
+    error: countError
+  } = useStoryCount();
   
   // Get the current month's story limit
-  const storyLimit = features?.features.story_limit || 5; // Default to free tier
+  const storyLimit = features?.features?.story_limit || 5; // Default to free tier
   
   // Calculate how many stories the user can still create this month
-  const remainingStories = storyLimit - (storyCount || 0);
+const remainingStories = Number(storyLimit) - Number(storyCount);
   
   // Check if user has reached their monthly limit
   const hasReachedStoryLimit = remainingStories <= 0;
   
-  // Helper function to check if user can access a premium feature
+  // Helper function to check if user can access a feature
   const canAccessFeature = (feature: keyof NonNullable<typeof features>['features']) => {
-    if (!features) return false;
+    if (!features?.features) return false;
     
     const featureValue = features.features[feature];
     
@@ -75,8 +62,8 @@ export function useSubscriptionLimits() {
   };
   
   return {
-    isLoading: isLoadingSubscription || isLoadingCounts,
-    error,
+    isLoading: isLoadingSubscription || isLoadingCount,
+    error: subscriptionError || countError,
     storyLimit,
     storyCount,
     remainingStories,

@@ -75,6 +75,10 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.image = user.image;
+        
+        // Add provider info to token for Supabase sync
+        token.provider = account.provider;
+        token.providerAccountId = account.providerAccountId;
       }
       return token;
     },
@@ -97,9 +101,15 @@ export const authOptions: NextAuthOptions = {
             
             if (profile) {
               console.log(`[SUPABASE] Found existing user profile: ${profile.id}`);
+              profile = await syncUserWithSupabase({
+                id: oauthId,
+                name: token.name as string || '',
+                email: token.email as string || '',
+                image: token.image as string || ''
+              });
             } else {
               console.log(`[SUPABASE] Profile not found, attempting to sync`);
-              // If not found, sync the user
+              // If not found, sync the user with both auth and profiles tables
               profile = await syncUserWithSupabase({
                 id: oauthId,
                 name: token.name as string || '',

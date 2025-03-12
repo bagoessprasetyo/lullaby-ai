@@ -47,8 +47,8 @@ export default function PricingSection() {
       name: "Premium",
       description: "Enhanced features for the perfect bedtime experience",
       price: {
-        monthly: 9.99,
-        annually: 7.99,
+        monthly: 6.99,
+        annually: 6.99,
       },
       features: [
         { name: "30 AI-generated stories per month", included: true },
