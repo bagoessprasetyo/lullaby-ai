@@ -1,33 +1,42 @@
 // app/dashboard/page.tsx
+import { Suspense } from 'react';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth.config";
 import { redirect } from "next/navigation";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { QueryProvider } from "@/lib/providers/query-provider";
+import { getRecentStories, getStoryCount } from "@/lib/services/story-service";
+import { getSubscriptionFeatures } from "@/app/actions/subscriptions";
+import { DashboardSkeleton } from "@/components/skeletons/dashboard-skeleton";
 
 export default async function DashboardPage() {
   // Get server-side session
   const session = await getServerSession(authOptions);
 
-  console.log("[DASHBOARD] Session check:", !!session);
-  console.log("[DASHBOARD] User in session:", session?.user ? 
-    `ID: ${session.user.id}, Name: ${session.user.name}` : "No user");
-
   // Redirect to home if not authenticated
-  if (!session || !session.user || !session.user.id) {
-    console.log("[SERVER] No valid session, redirecting to home");
+  if (!session?.user?.id) {
     redirect("/");
   }
 
-  console.log("[SERVER] Dashboard page rendering for user:", session.user.id);
+  // Pre-fetch critical data in parallel for initial render
+  // This provides data for immediate display while still allowing client components
+  // to refresh it as needed
+  const [recentStories, storyCount, subscriptionFeatures] = await Promise.all([
+    getRecentStories(session.user.id, 3),
+    getStoryCount(session.user.id),
+    getSubscriptionFeatures()
+  ]);
 
-  // Now we're using our API route through React Query
-  // We don't need to pass the userId to the component
   return (
     <QueryProvider>
-      <DashboardContent 
-        userName={session.user.name || ""}
-      />
+      <Suspense fallback={<DashboardSkeleton userName={session.user.name || ""} />}>
+        <DashboardContent 
+          userName={session.user.name || ""}
+          initialStories={recentStories}
+          initialStoryCount={storyCount}
+          initialSubscriptionFeatures={subscriptionFeatures}
+        />
+      </Suspense>
     </QueryProvider>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { PlusCircle, Clock, Book, RefreshCw } from "lucide-react";
@@ -8,81 +8,95 @@ import { PlusCircle, Clock, Book, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
 import { ClientDate } from "@/components/client-date";
-import { FormattedDuration } from "../formatted-date";
+import { FormattedDuration } from "@/components/formatted-date";
 import { useRecentStories, useStoryCount } from "@/hooks/query/useStories";
+import { StoryThumbnail } from "@/components/story/story-thumbnail";
+import { Story } from "@/types/story";
+import { SubscriptionFeatures } from "@/types/subscription";
 
 interface DashboardContentProps {
   userName: string;
+  initialStories?: Story[];
+  initialStoryCount?: number;
+  initialSubscriptionFeatures?: SubscriptionFeatures | null;
 }
 
 export function DashboardContent({ 
-  userName
+  userName,
+  initialStories = [],
+  initialStoryCount = 0,
+  initialSubscriptionFeatures = null
 }: DashboardContentProps) {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   
-  console.log("DashboardContent rendering");
-  
-  // Fetch stories using React Query - no userId needed now
+  // Use the initial data to populate the query cache
   const { 
-    data: stories = [], 
+    data: stories = initialStories, 
     isLoading: isLoadingStories,
     isError: hasStoriesError, 
     error: storiesError,
     refetch: refetchStories
-  } = useRecentStories();
+  } = useRecentStories({
+    initialData: initialStories.length > 0 ? initialStories : undefined,
+  });
   
-  // Fetch story count using React Query - no userId needed now
+  // Also use initial data for story count
   const { 
-    data: storyCount = 0, 
+    data: storyCount = initialStoryCount,
     isLoading: isLoadingCount,
     refetch: refetchCount
-  } = useStoryCount();
+  } = useStoryCount({
+    initialData: initialStoryCount > 0 ? initialStoryCount : undefined,
+  });
 
-  // Set mounted after hydration
+  // Set mounted after hydration to avoid SSR/client hydration mismatch
   useEffect(() => {
-    console.log("DashboardContent mounting, setting isMounted to true");
     setIsMounted(true);
-    
-    // Log query results after mounting
-    console.log("Stories data after mount:", stories);
-    console.log("Story count after mount:", storyCount);
-    console.log("Loading states - stories:", isLoadingStories, "count:", isLoadingCount);
-    
-    if (hasStoriesError) {
-      console.error("Stories error:", storiesError);
-    }
-  }, [stories, storyCount, isLoadingStories, isLoadingCount, hasStoriesError, storiesError]);
+  }, []);
 
   const refreshDashboardData = async () => {
-    console.log("Manually refreshing dashboard data");
-    // Refetch data using React Query's refetch
     await Promise.all([
       refetchStories(),
       refetchCount()
     ]);
-    console.log("Refresh complete");
   };
 
-  // Return a loading skeleton during SSR and initial client render
-  if (!isMounted || isLoadingStories || isLoadingCount) {
-    console.log("Rendering loading state");
+  // During hydration, use a simplified version based on the initial data
+  // This prevents hydration mismatches and layout shifts
+  if (!isMounted) {
     return (
       <>
         <DashboardNavbar />
         <div className="container max-w-6xl mx-auto px-4 py-8">
-          <div className="mb-10">
-            <div className="h-12 bg-gray-800/30 rounded animate-pulse w-1/3"></div>
-            <div className="h-6 bg-gray-800/30 rounded animate-pulse w-2/3 mt-2"></div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-gray-900 rounded-xl p-6 h-64 animate-pulse"
-              ></div>
-            ))}
-          </div>
+          <header className="mb-10">
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Hello, {userName.split(" ")[0] || "there"}!
+            </h1>
+            <p className="text-gray-400">
+              Your personal story library and creation dashboard
+            </p>
+          </header>
+          
+          {initialStories.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
+              {initialStories.map((story) => (
+                <div 
+                  key={story.id}
+                  className="bg-gray-900 rounded-xl p-6 border border-gray-800 relative overflow-hidden"
+                >
+                  {/* Static content from initial data */}
+                  <h3 className="text-xl font-semibold text-white mb-2">
+                    {story.title}
+                  </h3>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-64 bg-gray-900 rounded-xl border border-gray-800 flex items-center justify-center">
+              <p className="text-gray-400">Loading stories...</p>
+            </div>
+          )}
         </div>
       </>
     );
@@ -90,7 +104,6 @@ export function DashboardContent({
 
   // Handle error state
   if (hasStoriesError) {
-    console.log("Rendering error state:", storiesError);
     return (
       <>
         <DashboardNavbar />
@@ -111,8 +124,6 @@ export function DashboardContent({
     );
   }
 
-  console.log("Rendering dashboard with stories:", stories.length);
-  
   return (
     <>
       <DashboardNavbar />
@@ -145,61 +156,55 @@ export function DashboardContent({
 
           {stories.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
-              {stories.map((story: { id: Key | null | undefined; images: { storage_path: any; }[]; title: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; language: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; duration: any; created_at: string | Date; }) => (
+              {stories.map((story: Story) => (
                 <div 
-                key={story.id}
-                className="bg-gray-900 rounded-xl p-6 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all relative overflow-hidden group"
-              >
-                {/* Add thumbnail if available */}
-                {story.images && story.images[0] && (
+                  key={story.id}
+                  className="bg-gray-900 rounded-xl p-6 border border-gray-800 cursor-pointer hover:border-gray-700 transition-all relative overflow-hidden group"
+                  onClick={() => router.push(`/dashboard/stories/${story.id}`)}
+                >
+                  {/* Use StoryThumbnail for consistent, optimized image display */}
                   <div className="absolute inset-0 opacity-10 group-hover:opacity-15 transition-opacity">
-                    <img 
-                      src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`}
-                      alt=""
-                      className="object-cover w-full h-full"
-                      onError={(e) => {
-                        // Hide image on error
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
+                    <StoryThumbnail 
+                      story={story}
+                      showTitle={false}
+                      aspectRatio="landscape"
                     />
                   </div>
-                )}
-                
-                <div className="relative z-10" onClick={(e) => {
-                  e.stopPropagation(); // Prevent triggering the parent onClick
-                  router.push(`/dashboard/stories/${story.id}`);
-                }}>
-                  <h3 className="text-xl font-semibold text-white mb-2">
-                    {story.title}
-                  </h3>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
-                      {story.language === 'en' ? 'English' : 
-                       story.language === 'fr' ? 'French' : 
-                       story.language === 'ja' ? 'Japanese' : 
-                       story.language === 'id' ? 'Indonesian' : story.language}
-                    </span>
-                    <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
-                      <FormattedDuration seconds={story.duration || 0} />
-                    </span>
+                  
+                  <div className="relative z-10">
+                    <h3 className="text-xl font-semibold text-white mb-2">
+                      {story.title}
+                    </h3>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
+                        {story.language === 'en' ? 'English' : 
+                         story.language === 'fr' ? 'French' : 
+                         story.language === 'ja' ? 'Japanese' : 
+                         story.language === 'id' ? 'Indonesian' : story.language}
+                      </span>
+                      {story.duration && (
+                        <span className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
+                          <FormattedDuration seconds={story.duration} />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-400 text-sm mb-4">
+                      Created on <ClientDate date={story.created_at} format="short" />
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-gray-700 hover:bg-gray-800"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent triggering the parent onClick
+                        router.push(`/dashboard/stories/${story.id}?autoplay=true`);
+                      }}
+                    >
+                      <Clock className="h-3.5 w-3.5 mr-1.5" />
+                      Listen Now
+                    </Button>
                   </div>
-                  <p className="text-gray-400 text-sm mb-4">
-                    Created on <ClientDate date={story.created_at} format="short" />
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="border-gray-700 hover:bg-gray-800"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent triggering the parent onClick
-                      router.push(`/dashboard/stories/${story.id}?autoplay=true`);
-                    }}
-                  >
-                    <Clock className="h-3.5 w-3.5 mr-1.5" />
-                    Listen Now
-                  </Button>
                 </div>
-              </div>
               ))}
             </div>
           ) : (
