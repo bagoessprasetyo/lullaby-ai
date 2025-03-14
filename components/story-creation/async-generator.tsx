@@ -1,409 +1,430 @@
-// components/story-creation/async-generator.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { 
-  AlertCircle, 
-  Check, 
-  Sparkles, 
+import { Separator } from "@/components/ui/separator";
+import { StoryAudioPlayer } from "./story-audio-player";
+import { generateStoryAudio } from "@/lib/elevenlabs";
+import {
+  CheckCircle2,
+  FileText,
   Loader2,
-  Image as ImageIcon,
-  BookOpen,
-  Mic,
-  Music,
-  RefreshCw
+  RefreshCw,
+  RotateCcw,
+  Volume2,
+  XCircle,
+  AlertTriangle
 } from "lucide-react";
 import { StoryFormData } from "@/app/dashboard/create/page";
-import { createApiServices } from "@/lib/api/apiService";
-import { generateStory, pollStoryStatus } from "@/lib/api/storyGeneration";
-import { useToast } from "@/components/ui/use-toast";
-import { useUpgradeModal } from "@/hooks/useUpgradeModal";
-import { rateLimiter } from "@/lib/rate-limiter";
-import { GenerateStoryResponse } from "@/lib/api/storyGeneration";
+import { cn } from "@/lib/utils";
 
-interface AsyncGeneratorProps {
+interface AsyncStoryGeneratorProps {
   formData: StoryFormData;
   onReset: () => void;
 }
 
-export function AsyncStoryGenerator({ formData, onReset }: AsyncGeneratorProps) {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const { toast } = useToast();
-  const { openModal } = useUpgradeModal();
-  
-  // State for generation process
-  const [storyId, setStoryId] = useState<string | null>(null);
-  const [status, setStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
+export function AsyncStoryGenerator({
+  formData,
+  onReset
+}: AsyncStoryGeneratorProps) {
+  const [status, setStatus] = useState<"pending" | "generating" | "audio" | "completed" | "error">("pending");
   const [progress, setProgress] = useState(0);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
-  const [overallTimeout, setOverallTimeout] = useState<NodeJS.Timeout | null>(null);
-  
-  // Start generation when component mounts
-  useEffect(() => {
-    let isMounted = true;
-    const runGeneration = async () => {
-      if (isMounted) {
-        await startGeneration();
-        
-        // Set an overall timeout for the entire generation process (3 minutes)
-        const timeout = setTimeout(() => {
-          if (isMounted && status !== 'completed') {
-            console.log('Generation timed out after 3 minutes');
-            
-            // If we have a storyId but generation is taking too long, redirect to story anyway
-            if (storyId) {
-              console.log(`Timing out, but we have a storyId (${storyId}). Redirecting...`);
-              toast({
-                title: "Story partially ready",
-                description: "Your story may not have audio yet, but you can view the text. Audio may be added shortly.",
-                variant: "default"
-              });
-              router.push(`/dashboard/stories/${storyId}`);
-            } else {
-              setGenerationError("Story generation is taking longer than expected. Please try again.");
-              setStatus('failed');
-            }
-          }
-        }, 3 * 60 * 1000); // 3 minutes
-        
-        setOverallTimeout(timeout);
-      }
-    };
-    
-    runGeneration();
-    
-    return () => {
-      isMounted = false;
-      
-      // Clear the timeout when unmounting
-      if (overallTimeout) {
-        clearTimeout(overallTimeout);
-      }
-    };
-  }, []); 
-  
-  // Poll for story status when we have a storyId
-  useEffect(() => {
-    if (!storyId) return;
-    
-    // Start polling for status
-    const stopPolling = pollStoryStatus(
-      storyId,
-      (storyData) => {
-        // Handle completion
-        if (storyData.success && storyData.audioUrl) {
-          setStatus('completed');
-          setProgress(1.0);
-          
-          // Navigate to story page after a brief delay
-          setTimeout(() => {
-            router.push(`/dashboard/stories/${storyId}`);
-          }, 1000);
-        }
-      },
-      (progressValue, statusValue) => {
-        // Handle progress updates
-        setProgress(progressValue);
-        setStatus(statusValue as any);
-      }
-    );
-    
-    // Clean up polling when unmounted
-    return () => {
-      stopPolling();
-    };
-  }, [storyId, router]);
+  const [story, setStory] = useState<{
+    id: string;
+    title: string;
+    content: string;
+    audioUrl: string | null;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
-  // Start story generation
-  const startGeneration = useCallback(async () => {
+  // Start generating the story when component mounts
+  useEffect(() => {
+    console.log('[Story Generator] Component mounted, starting story generation');
+    generateStory();
+  }, []);
+
+  // Function to generate the story
+  const generateStory = async () => {
+    console.log('[Story Generator] Starting story generation process');
     try {
-      setIsStarting(true);
-      setStoryId(null);
-      setGenerationError(null);
-      setStatus('pending');
-      setProgress(0.05);
+      setStatus("generating");
+      setProgress(10);
+      setError(null);
+      setErrorDetails(null);
 
-      // Skip the rate limiter check in the client, let the server handle it
-      /*
-      // This was causing the issue - we'll handle rate limiting on the server side only
-      try {
-        const { success } = await rateLimiter.limit(session?.user?.id || 'anonymous');
-        if (!success) {
-          throw new Error('You can generate up to 5 stories per minute. Please wait before creating more.');
-        }
-      } catch (rateLimitError) {
-        console.error("Rate limit error:", rateLimitError);
-        const message = rateLimitError instanceof Error ? rateLimitError.message : "Rate limit exceeded";
-        if (message.includes('5 stories per minute')) {
-          setGenerationError(message);
-          openModal('story-generation');
-        } else {
-          setGenerationError(message);
-        }
-        setStatus('failed');
-        setIsStarting(false);
-        return;
-      }
-      */
+      // Convert images to base64
+      console.log(`[Story Generator] Converting ${formData.images.length} images to base64`);
+      const imagePromises = formData.images.map(file => fileToBase64(file));
+      const images = await Promise.all(imagePromises);
+
+      setProgress(20);
+      console.log('[Story Generator] Images converted successfully');
+
+      // Prepare request payload
+      const payload = {
+        images,
+        characters: formData.characters,
+        theme: formData.theme,
+        duration: formData.duration,
+        language: formData.language,
+        backgroundMusic: formData.backgroundMusic,
+        voice: formData.voice,
+      };
+
+      console.log('[Story Generator] Payload prepared:', {
+        theme: payload.theme,
+        language: payload.language,
+        voice: payload.voice,
+        imageCount: images.length,
+        characterCount: payload.characters.length
+      });
+
+      setProgress(30);
+
+      // Send API request to generate story
+      console.log('[Story Generator] Sending request to story generation API');
+      console.time('story-generation');
       
-      try {
-        // Make a direct fetch request instead of using the helper function
-        console.log("Preparing story generation request...");
-        
-        // Convert images to base64
-        const imagePromises = formData.images.map(file => {
-          return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        });
-        
-        const images = await Promise.all(imagePromises);
-        console.log(`Processed ${images.length} images for upload`);
-        
-        // Convert characters to the format expected by the API
-        const characters = formData.characters.map(character => ({
-          name: character.name,
-          description: character.description,
-        }));
-        
-        // Prepare the request payload
-        const payload = {
-          images,
-          characters,
-          theme: formData.theme,
-          duration: formData.duration,
-          language: formData.language,
-          backgroundMusic: formData.backgroundMusic,
-          voice: formData.voice,
-          userId: session?.user?.id || 'anonymous',
-        };
-        
-        console.log("Sending direct fetch request to generate story...");
-        
-        // Log the request with placeholders (don't log the actual image data)
-        console.log("Sending request with payload:", {
-          ...payload,
-          images: images.map((_, i) => `[Image ${i+1}]`)
-        });
-        
-        // Make the API request with actual image data
-        const response = await fetch('/api/stories/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Server error (${response.status}):`, errorText);
-          
-          // Try to parse error JSON if possible
-          try {
-            const errorJson = JSON.parse(errorText);
-            if (response.status === 429) {
-              // Handle rate limiting specifically
-              setGenerationError('You can generate up to 5 stories per minute. Please wait before creating more.');
-              openModal('story-generation');
-              setStatus('failed');
-              setIsStarting(false);
-              return; // Early return, don't proceed
-            } else {
-              throw new Error(errorJson.error || `Server error: ${response.status}`);
-            }
-          } catch (parseError) {
-            // If error response is not valid JSON
-            console.error("Failed to parse error response:", parseError);
-            throw new Error(`Server returned status ${response.status}: ${errorText.substring(0, 100)}`);
-          }
-        }
-        
-        // Get response as text first to log it
-        const responseText = await response.text();
-        console.log("Raw API response:", responseText);
-        
-        // Parse the response manually
-        let jsonResponse;
+      const response = await fetch('/api/stories/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      console.timeEnd('story-generation');
+      console.log(`[Story Generator] API response status: ${response.status}`);
+
+      setProgress(60);
+
+      if (!response.ok) {
+        // Get error details for debugging
+        let errorResponse;
         try {
-          jsonResponse = JSON.parse(responseText);
+          errorResponse = await response.json();
+          console.error('[Story Generator] API error response:', errorResponse);
         } catch (parseError) {
-          console.error("Failed to parse response as JSON:", parseError);
-          throw new Error("The server returned an invalid response format. Please try again.");
+          console.error('[Story Generator] Failed to parse API error response:', parseError);
+          errorResponse = { error: `Error ${response.status}` };
         }
         
-        if (jsonResponse.success && jsonResponse.storyId) {
-          setStoryId(jsonResponse.storyId);
-          setStatus('processing');
-          setProgress(0.3);
-          console.log(`Successfully started story generation with ID: ${jsonResponse.storyId}`);
-        } else {
-          throw new Error(jsonResponse.error || "Failed to start generation");
-        }
-      } catch (apiError) {
-        console.error("API error during story generation:", apiError);
-        
-        // Check for specific error types
-        const errorMessage = apiError instanceof Error ? apiError.message : "Unknown error";
-        if (errorMessage.includes('JSON.parse') || errorMessage.includes('invalid JSON') || 
-            errorMessage.includes('invalid response format')) {
-          setGenerationError("The server returned an invalid response. This is often caused by temporary issues with the AI service. Please try again.");
-        } else {
-          setGenerationError(errorMessage);
-        }
-        setStatus('failed');
+        throw new Error(errorResponse.error || `Error: ${response.status}`);
       }
-    } catch (error) {
-      console.error("Error starting generation:", error);
-      const message = error instanceof Error ? error.message : "Failed to start story generation";
-      setGenerationError(message);
-      setStatus('failed');
-    } finally {
-      setIsStarting(false);
-    }
-  }, [session, formData, openModal, router]);
-  
-  // Get current step description
-  const getStepDescription = () => {
-    if (status === 'pending') return "Preparing to create your story...";
-    if (status === 'failed') return "Story generation failed.";
-    
-    // If we've been waiting a long time, show a different message
-    if (progress > 0.85 && !storyId) {
-      return "Almost there! Finalizing your story...";
-    }
-    
-    if (progress < 0.2) return "Analyzing your images...";
-    if (progress < 0.4) return "Crafting your story...";
-    if (progress < 0.6) return "Creating character dialog...";
-    if (progress < 0.8) return "Converting story to speech...";
-    if (progress < 0.9) return "Adding background music...";
-    return "Finalizing your story...";
-  };
-  
-  // Get step icon
-  const getStepIcon = () => {
-    if (status === 'failed') return <AlertCircle className="h-5 w-5 text-red-500" />;
-    if (status === 'completed') return <Check className="h-5 w-5 text-green-500" />;
-    
-    if (progress < 0.2) return <ImageIcon className="h-5 w-5 text-blue-500" />;
-    if (progress < 0.4) return <BookOpen className="h-5 w-5 text-indigo-500" />;
-    if (progress < 0.6) return <BookOpen className="h-5 w-5 text-violet-500" />;
-    if (progress < 0.8) return <Mic className="h-5 w-5 text-purple-500" />;
-    if (progress < 0.9) return <Music className="h-5 w-5 text-pink-500" />;
-    return <Sparkles className="h-5 w-5 text-amber-500" />;
-  };
-  
-  return (
-    <div className="space-y-8 py-6">
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-white mb-3">Creating Your Story</h3>
-        <p className="text-gray-400 mb-1">
-          {getStepDescription()}
-        </p>
+
+      const data = await response.json();
+      console.log('[Story Generator] Story generation successful:', {
+        storyId: data.storyId,
+        title: data.title,
+        contentLength: data.textContent?.length,
+        hasAudio: !!data.audioUrl
+      });
+
+      if (!data.success) {
+        throw new Error(data.error || 'Story generation failed');
+      }
+
+      setProgress(80);
+
+      // Set the story data
+      setStory({
+        id: data.storyId,
+        title: data.title,
+        content: data.textContent,
+        audioUrl: data.audioUrl || null
+      });
+
+      // If the story doesn't already have audio, generate it
+      if (!data.audioUrl) {
+        setStatus("audio");
+        console.log('[Story Generator] Story doesn\'t have audio, starting TTS generation');
         
-        {progress > 0 && progress < 1 && status === 'processing' && (
-          <p className="text-xs text-indigo-400 mt-1">
-            <RefreshCw className="h-3 w-3 inline-block mr-1 animate-spin" />
-            Processing your story...
-          </p>
-        )}
-      </div>
-      
-      {/* Progress visualization */}
-      <div className="max-w-md mx-auto">
-        <div className="relative pt-4 pb-2">
-          <Progress 
-            value={progress * 100} 
-            className="h-3 bg-gray-800"
-          />
-          <div 
-            className="absolute flex items-center justify-center rounded-full bg-indigo-600 p-2 -top-2 transition-all"
-            style={{ 
-              left: `calc(${Math.max(2, Math.min(98, progress * 100))}% - 16px)`,
-              display: status === 'completed' ? 'none' : 'flex' 
-            }}
-          >
-            {getStepIcon()}
+        try {
+          const audioUrl = await generateAudio(data.textContent, formData.voice);
+          
+          // Update story with audio URL
+          setStory(prev => prev ? { ...prev, audioUrl } : null);
+          setStatus("completed");
+          setProgress(100);
+          console.log('[Story Generator] TTS generation successful');
+        } catch (audioError) {
+          console.error('[Story Generator] TTS generation failed:', audioError);
+          setError(`Failed to generate audio narration: ${audioError instanceof Error ? audioError.message : 'Unknown error'}`);
+          setErrorDetails('The story text was generated successfully, but we couldn\'t create the audio narration. Please try again or contact support if the problem persists.');
+          setStatus("error");
+        }
+      } else {
+        setStatus("completed");
+        setProgress(100);
+        console.log('[Story Generator] Story already has audio, marking as completed');
+      }
+    } catch (err) {
+      console.error('[Story Generator] Error in story generation process:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setStatus("error");
+    }
+  };
+
+  // Function to generate audio for the story
+  const generateAudio = async (text: string, voiceId: string): Promise<string> => {
+    console.log('[Story Generator] Starting audio generation with ElevenLabs');
+    console.log(`[Story Generator] Using voice ID: ${voiceId}`);
+    console.log(`[Story Generator] Text length: ${text.length} characters`);
+    
+    try {
+      // Generate audio using ElevenLabs
+      const audioData = await generateStoryAudio(text, voiceId);
+      console.log('[Story Generator] Audio generation successful');
+      return audioData;
+    } catch (err) {
+      console.error('[Story Generator] Error in audio generation:', err);
+      // Instead of handling the error and continuing, we'll propagate it
+      // so the entire story generation process can be marked as failed
+      throw err;
+    }
+  };
+
+  // Function to convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  // Render different content based on status
+  const renderContent = () => {
+    switch (status) {
+      case "pending":
+        return (
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-indigo-500 mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">Preparing your story</h3>
+            <p className="text-gray-400">We're getting everything ready...</p>
           </div>
-        </div>
-        
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>Analyzing</span>
-          <span>Creating</span>
-          <span>Finalizing</span>
-        </div>
-      </div>
-      
-      {/* Error message */}
-      {generationError && (
-        <Alert variant="destructive" className="max-w-md mx-auto bg-red-900/20 border-red-800">
-          <AlertCircle className="h-4 w-4 text-red-400" />
-          <AlertDescription className="text-red-300">
-            {generationError}
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      {/* Action buttons */}
-      <div className="flex justify-center gap-3 mt-8">
-        {status === 'failed' ? (
-          <>
-            <Button 
-              variant="outline" 
-              className="border-gray-800"
+        );
+
+      case "generating":
+        return (
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-indigo-500 mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">Creating your story</h3>
+            <p className="text-gray-400 mb-4">This may take a minute or two...</p>
+            <Progress value={progress} className="w-full max-w-md" />
+          </div>
+        );
+
+      case "audio":
+        return (
+          <div className="p-6">
+            {story && (
+              <>
+                <h2 className="text-xl font-bold text-white mb-2">{story.title}</h2>
+                <div className="rounded-lg bg-gray-800/60 p-4 mb-4 max-h-[300px] overflow-y-auto">
+                  <pre className="text-gray-300 whitespace-pre-wrap font-sans">
+                    {story.content}
+                  </pre>
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-center mb-2">
+                    <Volume2 className="h-5 w-5 text-indigo-400 mr-2" />
+                    <h3 className="text-white font-medium">Generating Audio Narration</h3>
+                  </div>
+                  <div className="flex items-center bg-gray-800/60 p-3 rounded-lg">
+                    <Loader2 className="h-5 w-5 animate-spin text-indigo-500 mr-3" />
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-300">Processing audio narration...</p>
+                      <p className="text-xs text-gray-400">This might take a minute for longer stories</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+
+      case "completed":
+        return (
+          <div className="p-6">
+            {story && (
+              <>
+                <h2 className="text-xl font-bold text-white mb-2">{story.title}</h2>
+                <div className="mb-4">
+                  <div className="flex items-center mb-2">
+                    <Volume2 className="h-5 w-5 text-indigo-400 mr-2" />
+                    <h3 className="text-white font-medium">Audio Narration</h3>
+                  </div>
+                  {story.audioUrl ? (
+                    <StoryAudioPlayer audioUrl={story.audioUrl} />
+                  ) : (
+                    <div className="bg-amber-900/20 border border-amber-800 p-3 rounded-lg text-sm text-amber-300">
+                      <div className="flex">
+                        <AlertTriangle className="h-5 w-5 mr-2 text-amber-400" />
+                        <p>Audio narration not available.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-center mb-2">
+                    <FileText className="h-5 w-5 text-indigo-400 mr-2" />
+                    <h3 className="text-white font-medium">Story Text</h3>
+                  </div>
+                  <div className="rounded-lg bg-gray-800/60 p-4 max-h-[300px] overflow-y-auto">
+                    <pre className="text-gray-300 whitespace-pre-wrap font-sans">
+                      {story.content}
+                    </pre>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center mt-6">
+                  <Button
+                    variant="outline"
+                    className="border-gray-700"
+                    onClick={onReset}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Create Another Story
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="default"
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                      onClick={() => {
+                        // Save to library would go here
+                        alert('Story saved to library!');
+                      }}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Save to Library
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+
+      case "error":
+        return (
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <XCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">Something went wrong</h3>
+            <p className="text-red-300 mb-3">{error || 'Unable to generate story'}</p>
+            {errorDetails && (
+              <p className="text-gray-400 text-sm mb-4 max-w-md">{errorDetails}</p>
+            )}
+            <Button
+              variant="default"
+              className="bg-indigo-600 hover:bg-indigo-700"
+              onClick={generateStory}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </Button>
+            <Button
+              variant="ghost"
+              className="mt-2"
               onClick={onReset}
             >
-              Change Settings
+              Start Over
             </Button>
-            <Button 
-              onClick={startGeneration}
-              className="bg-indigo-600 hover:bg-indigo-700"
-              disabled={isStarting}
-            >
-              {isStarting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Restarting...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Try Again
-                </>
-              )}
-            </Button>
-          </>
-        ) : (
-          <Button 
-            variant="outline" 
-            className="border-gray-800"
-            onClick={onReset}
-            disabled={status === 'completed'}
-          >
-            Cancel
-          </Button>
-        )}
+          </div>
+        );
+    }
+  };
+
+  return (
+    <Card className="bg-gray-900 border-gray-800 relative overflow-hidden">
+      {/* Status Indicator */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gray-800">
+        <div
+          className={cn(
+            "h-full transition-all duration-500",
+            status === "pending" ? "bg-indigo-600 w-[5%]" :
+            status === "generating" ? "bg-indigo-600" :
+            status === "audio" ? "bg-indigo-600 w-[90%]" :
+            status === "completed" ? "bg-green-600 w-full" :
+            "bg-red-600 w-full"
+          )}
+          style={{ width: `${progress}%` }}
+        />
       </div>
-      
-      {/* Generation details (can be expanded for debugging) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-8 text-xs text-gray-500 max-w-md mx-auto">
-          <p>Story ID: {storyId || 'Not started'}</p>
-          <p>Status: {status}</p>
-          <p>Progress: {Math.round(progress * 100)}%</p>
+
+      {/* Status Steps */}
+      <div className="flex justify-between px-6 pt-6 pb-2">
+        <div className="flex flex-col items-center">
+          <div
+            className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center border-2",
+              status === "pending" || status === "generating" || status === "audio" || status === "completed" ? "bg-indigo-900/50 border-indigo-500 text-indigo-300" : "bg-gray-800 border-gray-700 text-gray-500"
+            )}
+          >
+            {status === "generating" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+          </div>
+          <span className="text-xs mt-1 text-gray-400">Generate</span>
         </div>
-      )}
-    </div>
+
+        <div className="flex-1 flex items-center justify-center mt-4">
+          <div
+            className={cn(
+              "h-0.5 w-full",
+              status === "audio" || status === "completed" ? "bg-indigo-600" : "bg-gray-800"
+            )}
+          />
+        </div>
+
+        <div className="flex flex-col items-center">
+          <div
+            className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center border-2",
+              status === "audio" ? "bg-indigo-900/50 border-indigo-500 text-indigo-300" :
+              status === "completed" ? (story?.audioUrl ? "bg-indigo-900/50 border-indigo-500 text-indigo-300" : "bg-amber-900/50 border-amber-500 text-amber-300") :
+              "bg-gray-800 border-gray-700 text-gray-500"
+            )}
+          >
+            {status === "audio" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </div>
+          <span className="text-xs mt-1 text-gray-400">Narrate</span>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center mt-4">
+          <div
+            className={cn(
+              "h-0.5 w-full",
+              status === "completed" ? "bg-indigo-600" : "bg-gray-800"
+            )}
+          />
+        </div>
+
+        <div className="flex flex-col items-center">
+          <div
+            className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center border-2",
+              status === "completed" ? "bg-indigo-900/50 border-indigo-500 text-indigo-300" : "bg-gray-800 border-gray-700 text-gray-500"
+            )}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+          </div>
+          <span className="text-xs mt-1 text-gray-400">Complete</span>
+        </div>
+      </div>
+
+      <Separator className="bg-gray-800 mb-0" />
+
+      {renderContent()}
+    </Card>
   );
 }

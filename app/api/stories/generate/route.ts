@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/auth.config';
 import { getAdminClient } from '@/lib/supabase';
+import { rateLimiter } from '@/lib/rate-limiter';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    console.log(`[API] Generating story with theme: ${theme}, language: ${language}, duration: ${duration}`);
+    console.log(`[API] Generating story with theme: ${theme}, language: ${language}, duration: ${duration}, voice: ${voice}`);
     
     // Generate a unique ID for the story
     const storyId = uuidv4();
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
           }
           
           try {
-            const uploadResult = await cloudinary.uploader.upload(imageData, {
+            const uploadResult: { secure_url: string } = await cloudinary.uploader.upload(imageData, {
               folder: 'story-app-stories',
               public_id: `${storyId}-${imageUrls.length + 1}`
             });
@@ -205,61 +206,146 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    // Generate audio using ElevenLabs
+    let audioUrl = null;
+    try {
+      console.log('[API] Generating audio narration with ElevenLabs');
+      console.time('elevenlabs-tts');
+      
+      // Call ElevenLabs API
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      if (!apiKey) {
+        throw new Error('ELEVENLABS_API_KEY is not configured');
+      }
+      
+      // Limit text length to avoid issues with ElevenLabs API
+      let textToProcess = storyData.content;
+      if (textToProcess.length > 5000) {
+        console.log('[API] Text exceeds 5000 characters, truncating to the nearest paragraph break');
+        // Get first 5000 characters, but make sure we end at a paragraph
+        const firstPart = textToProcess.substring(0, 5000);
+        const lastParagraphEnd = firstPart.lastIndexOf('\n\n');
+        if (lastParagraphEnd > 2000) {
+          textToProcess = textToProcess.substring(0, lastParagraphEnd + 2);
+          console.log(`[API] Text truncated to ${textToProcess.length} characters`);
+        }
+      }
+      
+      // Call ElevenLabs API
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': apiKey
+        },
+        body: JSON.stringify({
+          text: textToProcess,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        // Try to get error details
+        let errorMessage = `ElevenLabs API error: ${response.status}`;
+        try {
+          const errorText = await response.text();
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.detail) {
+              errorMessage = `ElevenLabs API error: ${errorJson.detail}`;
+            }
+          } catch {
+            // Not JSON, use text
+            errorMessage = `ElevenLabs API error: ${errorText.substring(0, 100)}`;
+          }
+        } catch {}
+        
+        throw new Error(errorMessage);
+      }
+      
+      // Upload audio to Cloudinary
+      const audioBuffer = await response.arrayBuffer();
+      console.log(`[API] Successfully received audio (${audioBuffer.byteLength} bytes)`);
+      
+      const audioBase64 = `data:audio/mpeg;base64,${Buffer.from(audioBuffer).toString('base64')}`;
+      
+      const uploadResult = await cloudinary.uploader.upload(audioBase64, {
+        resource_type: 'auto',
+        folder: 'story-app-audio',
+        public_id: `${storyId}-audio`,
+        overwrite: true
+      });
+      
+      audioUrl = uploadResult.secure_url;
+      console.log(`[API] Audio uploaded to Cloudinary: ${audioUrl}`);
+      console.timeEnd('elevenlabs-tts');
+      
+    } catch (audioError) {
+      console.error('[API] Error generating or uploading audio:', audioError);
+      // Continue without audio, but log the error
+      // The client will handle missing audio gracefully
+    }
+    
     // Store story in database
     console.log('[API] Storing story in database');
     try {
       const adminClient = getAdminClient();
       
       // If backgroundMusic is provided but not a valid UUID, look it up by category
-    let backgroundMusicId = null;
-    if (backgroundMusic) {
-      // Check if it's already a valid UUID
-      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (uuidPattern.test(backgroundMusic)) {
-        // It's already a UUID, use it directly
-        backgroundMusicId = backgroundMusic;
-      } else {
-        // It's a category name, look up the first matching track
-        console.log(`[API] Looking up background music by category: ${backgroundMusic}`);
-        try {
-          const { data: musicData, error: musicError } = await adminClient
-            .from('background_music')
-            .select('id')
-            .eq('category', backgroundMusic)
-            .limit(1)
-            .single();
-          
-          if (musicError || !musicData) {
-            console.error('[API] Error finding background music:', musicError);
-          } else {
-            backgroundMusicId = musicData.id;
-            console.log(`[API] Found background music ID: ${backgroundMusicId}`);
-          }
-        } catch (musicLookupError) {
-          console.error('[API] Exception finding background music:', musicLookupError);
-        }
-      }
-    }
-    
-    // Convert duration string to seconds
-    let durationSeconds = 300; // Default to 5 minutes (300 seconds)
-    if (duration && typeof duration === 'string') {
-      if (duration in DURATION_LENGTHS) {
-        durationSeconds = DURATION_LENGTHS[duration as keyof typeof DURATION_LENGTHS];
-        console.log(`[API] Converted duration "${duration}" to ${durationSeconds} seconds`);
-      } else {
-        // Try parsing as an integer directly
-        const parsedDuration = parseInt(duration, 10);
-        if (!isNaN(parsedDuration)) {
-          durationSeconds = parsedDuration;
-          console.log(`[API] Using numeric duration: ${durationSeconds} seconds`);
+      let backgroundMusicId = null;
+      if (backgroundMusic) {
+        // Check if it's already a valid UUID
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (uuidPattern.test(backgroundMusic)) {
+          // It's already a UUID, use it directly
+          backgroundMusicId = backgroundMusic;
         } else {
-          console.warn(`[API] Unknown duration value: ${duration}, using default of ${durationSeconds} seconds`);
+          // It's a category name, look up the first matching track
+          console.log(`[API] Looking up background music by category: ${backgroundMusic}`);
+          try {
+            const { data: musicData, error: musicError } = await adminClient
+              .from('background_music')
+              .select('id')
+              .eq('category', backgroundMusic)
+              .limit(1)
+              .single();
+            
+            if (musicError || !musicData) {
+              console.error('[API] Error finding background music:', musicError);
+            } else {
+              backgroundMusicId = musicData.id;
+              console.log(`[API] Found background music ID: ${backgroundMusicId}`);
+            }
+          } catch (musicLookupError) {
+            console.error('[API] Exception finding background music:', musicLookupError);
+          }
         }
       }
-    }
-    
-    // First, create the story record
+      
+      // Convert duration string to seconds
+      let durationSeconds = 300; // Default to 5 minutes (300 seconds)
+      if (duration && typeof duration === 'string') {
+        if (duration in DURATION_LENGTHS) {
+          durationSeconds = DURATION_LENGTHS[duration as keyof typeof DURATION_LENGTHS];
+          console.log(`[API] Converted duration "${duration}" to ${durationSeconds} seconds`);
+        } else {
+          // Try parsing as an integer directly
+          const parsedDuration = parseInt(duration, 10);
+          if (!isNaN(parsedDuration)) {
+            durationSeconds = parsedDuration;
+            console.log(`[API] Using numeric duration: ${durationSeconds} seconds`);
+          } else {
+            console.warn(`[API] Unknown duration value: ${duration}, using default of ${durationSeconds} seconds`);
+          }
+        }
+      }
+      
+      // First, create the story record
       const { data: story, error } = await adminClient
         .from('stories')
         .insert({
@@ -270,8 +356,10 @@ export async function POST(req: NextRequest) {
           theme,
           duration: durationSeconds, // Using the converted integer value
           language,
+          audio_url: audioUrl, // Save the actual audio URL
           background_music_id: backgroundMusicId, // Using the resolved UUID or null
-          voice_profile_id: null // Default to system voice
+          voice_profile_id: null, // Default to system voice
+          storage_path: audioUrl ? `story-app-audio/${storyId}-audio` : null
         })
         .select()
         .single();
@@ -312,7 +400,7 @@ export async function POST(req: NextRequest) {
       if (characters && characters.length > 0) {
         console.log('[API] Storing character records');
         
-        const characterRecords = characters.map(char => ({
+        const characterRecords = characters.map((char: { name: any; description: any; }) => ({
           story_id: storyId,
           name: char.name,
           description: char.description || ''
@@ -330,18 +418,14 @@ export async function POST(req: NextRequest) {
       
       console.log(`[API] Story stored in database with ID: ${story.id}`);
       
-      // Queue audio generation (this would normally be done via a background job)
-      // For now, we'll simulate this by generating a mock audio URL
-      const audioUrl = '/public/story.wav'; // This will be replaced with actual audio
-      
       // Return success response
       const response = {
         success: true,
         storyId: story.id,
         title: storyData.title,
         textContent: storyData.content,
-        audioUrl,
-        duration: 120, // Placeholder duration in seconds
+        audioUrl: audioUrl, // Return the real audio URL
+        duration: durationSeconds,
       };
       
       console.log('[API] Story generation successful, returning response');
@@ -635,4 +719,25 @@ Length: ${durationInWords} words (approximately)
       And they all lived happily ever after.`
     };
   }
+}
+
+// Find this section where the error is being thrown
+try {
+  // ElevenLabs API call code
+} catch (error) {
+  console.error('[API] Error generating audio with ElevenLabs:', error);
+  
+  // Fix the error handling here
+  let errorMessage = 'ElevenLabs API error';
+  if (error instanceof Error) {
+    errorMessage = `ElevenLabs API error: ${error.message}`;
+  } else if (typeof error === 'object' && error !== null) {
+    try {
+      errorMessage = `ElevenLabs API error: ${JSON.stringify(error)}`;
+    } catch (e) {
+      errorMessage = 'ElevenLabs API error: Unknown error format';
+    }
+  }
+  
+  throw new Error(errorMessage);
 }

@@ -96,10 +96,10 @@ export async function LibraryContent({
     storage_path: story.storage_path || null,
     // Additional display properties
     coverImage: story.images && story.images.length > 0
-      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
+      ? `${story.images[0].storage_path}`
       : "https://via.placeholder.com/300x300?text=No+Image",
     thumbnail: story.images && story.images.length > 0
-      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
+      ? `${story.images[0].storage_path}`
       : "https://via.placeholder.com/100x100?text=No+Image",
     backgroundMusic: "", // Could be fetched if needed
     characters: [], // Could be fetched if needed

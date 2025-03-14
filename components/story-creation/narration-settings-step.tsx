@@ -1,7 +1,6 @@
-// components/story-creation/narration-settings-step.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,8 @@ import {
   Wind,
   Waves,
   CloudRain,
-  Star
+  Star,
+  Loader2
 } from "lucide-react";
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { cn } from "@/lib/utils";
@@ -45,14 +45,6 @@ type LanguageOption = {
   nativeName: string;
   flag: string;
 };
-
-// AI voices
-const aiVoices = [
-  { id: 'ai-1', name: 'Emily', gender: 'female', style: 'Gentle' },
-  { id: 'ai-2', name: 'James', gender: 'male', style: 'Warm' },
-  { id: 'ai-3', name: 'Lily', gender: 'female', style: 'Playful' },
-  { id: 'ai-4', name: 'Michael', gender: 'male', style: 'Calm' },
-];
 
 // Mock voice profiles for demo
 const mockVoiceProfiles = [
@@ -92,6 +84,71 @@ export function NarrationSettingsStep({
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("language");
   const { openModal } = useUpgradeModal();
+  
+  // ElevenLabs voices state
+  const [voices, setVoices] = useState<any[]>([]);
+  const [isLoadingVoices, setIsLoadingVoices] = useState(true);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
+  
+  // Fetch ElevenLabs voices
+  useEffect(() => {
+    const fetchVoices = async () => {
+      try {
+        console.log('Fetching voices from API...');
+        setIsLoadingVoices(true);
+        setVoiceError(null);
+        
+        const response = await fetch('/api/voices');
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch voices: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Voice data received:', data);
+        
+        if (data.success === false) {
+          throw new Error(data.error || 'Failed to fetch voices');
+        }
+        
+        // Filter voices to include only those with appropriate labels
+        const filteredVoices = data.voices.filter((voice: any) => {
+          // Include voices marked as professional or that have specific kid-friendly labels
+          return voice.category === 'professional' || 
+                 (voice.labels && (
+                   voice.labels.accent === 'American' || 
+                   voice.labels.description === 'storyteller' ||
+                   voice.labels.use_case === 'storytelling'
+                 ));
+        });
+        
+        setVoices(filteredVoices);
+        
+        // Auto-select first voice if none is selected
+        if (!formData.voice && filteredVoices.length > 0) {
+          updateFormData("voice", filteredVoices[0].voice_id);
+        }
+      } catch (err) {
+        console.error('Error fetching voices:', err);
+        setVoiceError(err instanceof Error ? err.message : 'Failed to fetch voices');
+      } finally {
+        setIsLoadingVoices(false);
+      }
+    };
+
+    if (activeTab === "voice") {
+      fetchVoices();
+    }
+    
+    // Cleanup function to stop any playing audio
+    return () => {
+      if (audioRef) {
+        audioRef.pause();
+        audioRef.src = '';
+      }
+    };
+  }, [activeTab, formData.voice, updateFormData]);
   
   // Language options
   const languageOptions: LanguageOption[] = [
@@ -181,8 +238,57 @@ export function NarrationSettingsStep({
     updateFormData("backgroundMusic", value);
   };
   
-  const togglePlayAudio = (id: string) => {
-    // Simulated playback
+  // Function to play voice sample from ElevenLabs
+  const playVoiceSample = async (voiceId: string) => {
+    try {
+      // If already playing, stop it
+      if (currentlyPlaying === voiceId) {
+        if (audioRef) {
+          audioRef.pause();
+          audioRef.src = '';
+        }
+        setCurrentlyPlaying(null);
+        return;
+      }
+      
+      // Stop any currently playing audio
+      if (audioRef) {
+        audioRef.pause();
+        audioRef.src = '';
+      }
+      
+      // Find voice to get preview URL
+      const voice = voices.find(v => v.voice_id === voiceId);
+      if (!voice || !voice.preview_url) {
+        throw new Error('Voice sample not available');
+      }
+      
+      // Create new audio element
+      const audio = new Audio(voice.preview_url);
+      setAudioRef(audio);
+      
+      // Set up event listeners
+      audio.addEventListener('ended', () => {
+        setCurrentlyPlaying(null);
+      });
+      
+      audio.addEventListener('error', (e) => {
+        console.error('Audio playback error:', e);
+        setCurrentlyPlaying(null);
+      });
+      
+      // Play the audio
+      setCurrentlyPlaying(voiceId);
+      await audio.play();
+    } catch (err) {
+      console.error('Error playing voice sample:', err);
+      setCurrentlyPlaying(null);
+    }
+  };
+  
+  // Function to play custom voice profiles
+  const togglePlayCustomVoice = (id: string) => {
+    // Simulated playback for custom voices
     if (currentlyPlaying === id) {
       setCurrentlyPlaying(null);
     } else {
@@ -285,51 +391,73 @@ export function NarrationSettingsStep({
                 AI Narration Voices
               </h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {aiVoices.map((voice) => (
-                  <div key={voice.id} className="bg-gray-800/50 rounded-md p-3 flex items-start space-x-2">
-                    <RadioGroupItem 
-                      value={voice.id} 
-                      id={voice.id} 
-                      className="mt-1"
-                    />
-                    <div className="grid gap-1 w-full">
-                      <Label 
-                        htmlFor={voice.id} 
-                        className="flex justify-between font-medium cursor-pointer"
-                      >
-                        <span>{voice.name}</span>
-                        <span className="text-gray-400 text-sm">{voice.gender}</span>
-                      </Label>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          {voice.style} storytelling style
-                        </p>
-                        
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "h-7 w-7",
-                            currentlyPlaying === voice.id ? "text-indigo-400" : "text-gray-400"
-                          )}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            togglePlayAudio(voice.id);
-                          }}
-                        >
-                          {currentlyPlaying === voice.id ? (
-                            <Pause className="h-3.5 w-3.5" />
-                          ) : (
-                            <Play className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
+              {isLoadingVoices ? (
+                <div className="flex items-center justify-center p-6 bg-gray-800/50 rounded-lg">
+                  <Loader2 className="h-5 w-5 animate-spin text-indigo-500 mr-2" />
+                  <span className="text-gray-400">Loading voices...</span>
+                </div>
+              ) : voiceError ? (
+                <Alert className="bg-red-900/20 border-red-800">
+                  <AlertCircle className="h-4 w-4 text-red-400" />
+                  <AlertDescription className="text-red-300">
+                    {voiceError}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {voices.length > 0 ? (
+                    voices.map((voice) => (
+                      <div key={voice.voice_id} className="bg-gray-800/50 rounded-md p-3 flex items-start space-x-2">
+                        <RadioGroupItem 
+                          value={voice.voice_id} 
+                          id={voice.voice_id} 
+                          className="mt-1"
+                        />
+                        <div className="grid gap-1 w-full">
+                          <Label 
+                            htmlFor={voice.voice_id} 
+                            className="flex justify-between font-medium cursor-pointer"
+                          >
+                            <span>{voice.name}</span>
+                            <span className="text-gray-400 text-sm">
+                              {voice.labels?.gender || 'Professional'}
+                            </span>
+                          </Label>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-muted-foreground">
+                              {voice.labels?.description || voice.description || 'Storytelling voice'}
+                            </p>
+                            
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                "h-7 w-7",
+                                currentlyPlaying === voice.voice_id ? "text-indigo-400" : "text-gray-400"
+                              )}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                playVoiceSample(voice.voice_id);
+                              }}
+                            >
+                              {currentlyPlaying === voice.voice_id ? (
+                                <Pause className="h-3.5 w-3.5" />
+                              ) : (
+                                <Play className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="col-span-2 p-4 text-center bg-gray-800/50 rounded-lg">
+                      <p className="text-gray-400">No voices available</p>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
             
             {/* Custom Voice Profiles */}
@@ -421,7 +549,7 @@ export function NarrationSettingsStep({
                         )}
                         onClick={(e) => {
                           e.preventDefault();
-                          togglePlayAudio(profile.id);
+                          togglePlayCustomVoice(profile.id);
                         }}
                       >
                         {currentlyPlaying === profile.id ? (
@@ -520,7 +648,7 @@ export function NarrationSettingsStep({
                       )}
                       onClick={(e) => {
                         e.preventDefault();
-                        togglePlayAudio(option.id);
+                        togglePlayCustomVoice(option.id);
                       }}
                     >
                       {currentlyPlaying === option.id ? (
