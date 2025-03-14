@@ -52,6 +52,8 @@ export function ImageAnalyzer({
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [rawAnalysis, setRawAnalysis] = useState<any[]>([]);
+  const [showRawAnalysis, setShowRawAnalysis] = useState(false);
   
   // Automatically start analysis when images change
   useEffect(() => {
@@ -108,25 +110,59 @@ export function ImageAnalyzer({
       const data = await response.json();
       setAnalysisProgress(100);
       
+      // Save raw analysis for advanced view
+      if (data.results) {
+        const deepseekAnalyses = data.results
+          .map((result: any) => result.analysis.deepseek)
+          .filter(Boolean);
+        setRawAnalysis(deepseekAnalyses);
+      }
+      
       // Convert API suggestions to our format
       const newSuggestions: Suggestion[] = [];
       
       // Theme suggestion
       if (data.suggestions.theme?.suggestion) {
+        // Get detailed analysis for better description
+        const themeDetails = data.results.map(result => 
+          result.analysis.deepseek?.themes || []
+        ).flat().filter(Boolean);
+        
+        const themeDescription = themeDetails.length > 0
+          ? `AI detected themes: ${themeDetails.slice(0, 3).join(', ')}`
+          : `AI detected elements suggesting a ${data.suggestions.theme.suggestion} theme`;
+        
         newSuggestions.push({
           type: 'theme',
           value: data.suggestions.theme.suggestion,
-          description: `AI detected elements suggesting a ${data.suggestions.theme.suggestion} theme`,
+          description: themeDescription,
           confidence: data.suggestions.theme.confidence
         });
       }
       
       // Duration suggestion
       if (data.suggestions.duration?.suggestion) {
+        // Get subject counts for better duration explanation
+        const subjectCounts = data.results.map(result => 
+          (result.analysis.deepseek?.subjects || []).length
+        );
+        
+        const avgSubjects = subjectCounts.length > 0 
+          ? subjectCounts.reduce((sum, count) => sum + count, 0) / subjectCounts.length 
+          : 0;
+        
+        let durationReason = `Based on image content, a ${data.suggestions.duration.suggestion} story is recommended`;
+        
+        if (avgSubjects > 3) {
+          durationReason = `Rich content with multiple elements suggests a ${data.suggestions.duration.suggestion} story`;
+        } else if (avgSubjects <= 1) {
+          durationReason = `Simple scene suggests a ${data.suggestions.duration.suggestion} story`;
+        }
+        
         newSuggestions.push({
           type: 'duration',
           value: data.suggestions.duration.suggestion,
-          description: `Based on image content, a ${data.suggestions.duration.suggestion} story is recommended`,
+          description: durationReason,
           confidence: data.suggestions.duration.confidence
         });
       }
@@ -395,6 +431,70 @@ export function ImageAnalyzer({
               </Card>
             );
           })}
+        </div>
+      )}
+      
+      {/* Raw Analysis Display */}
+      {analysisState === 'complete' && rawAnalysis.length > 0 && (
+        <div className="mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRawAnalysis(!showRawAnalysis)}
+            className="text-xs mb-2"
+          >
+            <Brain className="h-3.5 w-3.5 mr-1.5" />
+            {showRawAnalysis ? 'Hide Detailed AI Analysis' : 'Show Detailed AI Analysis'}
+          </Button>
+          
+          {showRawAnalysis && (
+            <Card className="p-3 bg-indigo-900/10 border-indigo-800/40 text-sm overflow-auto max-h-80">
+              {rawAnalysis.map((analysis, index) => (
+                <div key={index} className="mb-3 last:mb-0">
+                  <h4 className="text-indigo-300 text-xs uppercase font-medium mb-1">Image {index + 1} Analysis</h4>
+                  
+                  {/* Setting */}
+                  {analysis.setting && (
+                    <div className="mb-2">
+                      <span className="text-gray-400 text-xs">Setting: </span>
+                      <span className="text-white text-xs">{analysis.setting}</span>
+                    </div>
+                  )}
+                  
+                  {/* Subjects */}
+                  {analysis.subjects && analysis.subjects.length > 0 && (
+                    <div className="mb-2">
+                      <span className="text-gray-400 text-xs">Subjects: </span>
+                      <span className="text-white text-xs">{analysis.subjects.join(', ')}</span>
+                    </div>
+                  )}
+                  
+                  {/* Mood */}
+                  {analysis.mood && (
+                    <div className="mb-2">
+                      <span className="text-gray-400 text-xs">Mood: </span>
+                      <span className="text-white text-xs">{analysis.mood}</span>
+                    </div>
+                  )}
+                  
+                  {/* Details */}
+                  {analysis.details && analysis.details.length > 0 && (
+                    <div className="mb-2">
+                      <span className="text-gray-400 text-xs">Details: </span>
+                      <span className="text-white text-xs">{analysis.details.join('; ')}</span>
+                    </div>
+                  )}
+                  
+                  {/* Raw Content if not processed correctly */}
+                  {analysis.raw && !analysis.themes && (
+                    <div className="text-xs text-gray-300 mt-2 whitespace-pre-wrap">
+                      {analysis.raw}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </Card>
+          )}
         </div>
       )}
       

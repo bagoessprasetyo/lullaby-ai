@@ -416,7 +416,8 @@ export default function StoryViewer({ initialStory }: StoryViewerProps) {
       pages.push({
         id: `page-${i + 1}`,
         text: pageText || "Enjoy this moment in the story...",
-        imageUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${images[i].storage_path}`,
+        imageUrl: `${images[i].storage_path}`,
+        // imageUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${images[i].storage_path}`,
         audioUrl: story.audio_url || undefined
       });
     }
@@ -453,6 +454,7 @@ export default function StoryViewer({ initialStory }: StoryViewerProps) {
     if (story.background_music && story.background_music.storage_path) {
       // @ts-ignore
       storyPlayerData.backgroundMusicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.background_music.storage_path}`;
+      // storyPlayerData.backgroundMusicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.background_music.storage_path}`;
     }
     
     return storyPlayerData;
@@ -586,7 +588,7 @@ export default function StoryViewer({ initialStory }: StoryViewerProps) {
                         <Skeleton className="w-full h-full absolute inset-0" />
                       ) : null}
                       <img 
-                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${image.storage_path}`}
+                        src={`${image.storage_path}`}
                         alt={`Story image ${index + 1}`}
                         className={`object-contain w-full h-full transition-opacity duration-500 ${imagesLoaded ? 'opacity-100' : 'opacity-0'}`}
                         onLoad={() => {

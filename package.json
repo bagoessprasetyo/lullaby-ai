@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@custom-react-hooks/use-media-query": "^1.5.1",
     "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-avatar": "^1.1.3",
@@ -39,6 +40,7 @@
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.5.1",
     "clsx": "^2.1.1",
+    "cmdk": "1.0.0",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.5.2",
     "framer-motion": "^12.4.10",
@@ -51,6 +53,7 @@
     "plaiceholder": "^3.0.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "recharts": "^2.15.1",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.2",
     "tailwindcss-animate": "^1.0.7",

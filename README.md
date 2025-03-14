@@ -1,4 +1,61 @@
-# Lullaby.ai Home UI Upgrade Guide
+# Lullaby.ai
+
+Lullaby.ai is an application that generates personalized bedtime stories using AI technology. Upload family photos, customize story settings, and generate engaging narrated stories for your children.
+
+## AI Integrations
+
+The application integrates three powerful AI services to create a complete story generation pipeline:
+
+### 1. BLIP-2 for Image Analysis (via Hugging Face)
+
+- **Image Analysis**: Photos are analyzed to identify subjects, scenes, mood, and story elements
+- **Theme Detection**: Automatically suggests appropriate story themes based on image content
+- **Character Identification**: Detects potential characters from the uploaded images
+- **Detail Extraction**: Identifies interesting details that can be incorporated into stories
+
+### 2. Mistral-7B for Story Generation (via Hugging Face)
+
+- **AI-Powered Storytelling**: Generates creative and engaging children's stories based on user preferences
+- **Context-Aware Content**: Incorporates elements from uploaded images into story narratives
+- **Customizable Output**: Adjusts story length, theme, and characters based on user input
+- **Structured Format**: Returns well-formatted stories with appropriate titles and narrative flow
+
+### 3. ElevenLabs API for Voice Synthesis
+
+- **High-Quality TTS**: Converts generated stories into natural-sounding audio narration
+- **Voice Selection**: Offers multiple voice options (male, female, child, storyteller)
+- **Custom Voice Parameters**: Configurable settings for stability and similarity boost
+- **Audio Storage**: Generated audio is stored in Cloudinary for efficient delivery
+
+### Complete Workflow:
+1. **Image Analysis**: 
+   - Upload images to Cloudinary for storage
+   - Send the Cloudinary URL to DeepSeek Vision API for detailed analysis
+   - Process the analysis to create theme, duration, and character suggestions
+
+2. **Story Generation**:
+   - When the user finalizes their choices, send the parameters to DeepSeek LLM
+   - Generate a customized story incorporating all the elements
+   - Store the story in the database
+
+3. **Audio Narration**:
+   - Send the story text to ElevenLabs API with selected voice parameters
+   - Process the audio response and upload to Cloudinary
+   - Update the story record with the audio URL and duration
+
+### Environment Variables Required:
+```
+# AI Services
+HUGGINGFACE_API_KEY=your_huggingface_api_key
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+
+# Cloudinary for Image and Audio Storage
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+## Home UI Upgrade Guide
 
 This guide provides instructions for upgrading the Home UI of our Lullaby.ai application. The goal is to enhance the user experience, improve visual appeal, and better showcase our core features.
 

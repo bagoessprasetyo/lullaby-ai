@@ -40,7 +40,8 @@ export function useWebSocket(options: WebSocketOptions = {}): WebSocketHook {
   const reconnectInterval = options.reconnectInterval || 3000;
   const messagesQueueRef = useRef<any[]>([]);
   
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  // Use the app's own domain for WebSocket
+  const API_URL = typeof window !== 'undefined' ? window.location.origin : '';
   const WS_URL = API_URL.replace(/^http/, 'ws');
   
   const connect = useCallback(() => {
@@ -85,7 +86,22 @@ export function useWebSocket(options: WebSocketOptions = {}): WebSocketHook {
       };
       
       ws.onmessage = (event) => {
-        options.onMessage?.(event);
+        try {
+          // Validate that we received valid JSON before passing it on
+          const text = event.data;
+          console.log("WebSocket received message:", text);
+          
+          // Try to parse JSON (this will throw if invalid)
+          if (typeof text === 'string') {
+            JSON.parse(text);
+          }
+          
+          // If we reach here, either it's valid JSON or it's not a string
+          options.onMessage?.(event);
+        } catch (error) {
+          console.error("WebSocket received invalid JSON:", error);
+          console.log("Raw message:", event.data);
+        }
       };
       
       ws.onclose = (event) => {
@@ -221,9 +237,20 @@ export function useStoryGenerationStatus(requestId: string | null) {
   
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
-      const data = JSON.parse(event.data);
+      // Log the raw message for debugging
+      console.log(`WebSocket message for request ${requestId}:`, event.data);
+      
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch (parseError) {
+        console.error('Error parsing WebSocket message:', parseError);
+        console.error('Raw message content:', event.data);
+        return;
+      }
       
       if (data.type === 'status_update' && data.request_id === requestId) {
+        console.log(`Status update for ${requestId}:`, data);
         setStatus(data.status);
         setProgress(data.progress);
         
@@ -236,7 +263,7 @@ export function useStoryGenerationStatus(requestId: string | null) {
         }
       }
     } catch (error) {
-      console.error('Error parsing WebSocket message:', error);
+      console.error('Unexpected error handling WebSocket message:', error);
     }
   }, [requestId]);
   

@@ -1,24 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { motion } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
-import { useRecentStories, useStoryCount } from "@/hooks/query/useStories";
+import { useRecentStories, useStoryCount, useFavoriteStories } from "@/hooks/query/useStories";
 import { Story } from "@/types/story";
 import { SubscriptionFeatures } from "@/types/subscription";
 import { PlayHistoryEntry } from "@/lib/services/history-service";
+import { trackDashboardInteraction } from "@/lib/services/usage-tracking-service";
 
-// Import our custom components
+// Import custom components
 import { QuickActions } from "./quick-actions";
 import { ListeningInsights } from "./listening-insights";
 import { StoryCategorization } from "./story-categorization";
-import { trackDashboardInteraction } from "@/lib/services/user-service";
+import { StoryRecommendations } from "./story-recommendations";
+import { MilestoneTracker } from "./milestone-tracker";
+import { WelcomeBack } from "./welcome-back";
+import { MobileDashboard } from "./mobile-dashboard";
+import { EnhancedSearchBar } from "./enhanced-search";
 import { historyEntriesToStories } from "@/lib/utils/story-utils";
 
-interface DashboardContentProps {
+// Define interface for component props
+interface FinalDashboardProps {
   userName: string;
   initialStories?: Story[];
   initialStoryCount?: number;
@@ -47,9 +54,10 @@ interface DashboardContentProps {
       playCount: number;
     } | null;
   };
+  initialLastVisit?: string | null;
 }
 
-export function DashboardContent({ 
+export function FinalDashboard({ 
   userName,
   initialStories = [],
   initialStoryCount = 0,
@@ -72,13 +80,20 @@ export function DashboardContent({
     totalDuration: 0,
     averagePerDay: 0,
     mostPlayedStory: null
-  }
-}: DashboardContentProps) {
+  },
+  initialLastVisit = null
+}: FinalDashboardProps) {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [insightsTimeRange, setInsightsTimeRange] = useState<'7days' | '30days' | '90days' | 'all'>('30days');
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchFilters, setSearchFilters] = useState({});
   
-  // Use the initial data to populate the query cache
+  // Check if viewport is mobile
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  
+  // Use React Query data with initial values
   const { 
     data: stories = initialStories, 
     isLoading: isLoadingStories,
@@ -89,7 +104,6 @@ export function DashboardContent({
     initialData: initialStories.length > 0 ? initialStories : undefined,
   });
   
-  // Also use initial data for story count
   const { 
     data: storyCount = initialStoryCount,
     isLoading: isLoadingCount,
@@ -97,17 +111,25 @@ export function DashboardContent({
   } = useStoryCount({
     initialData: initialStoryCount > 0 ? initialStoryCount : undefined,
   });
+  
+  const {
+    data: favoriteStories = initialFavoriteStories,
+    isLoading: isLoadingFavorites,
+    refetch: refetchFavorites
+  } = useFavoriteStories();
 
   // State for other data that would normally be fetched with React Query
-  const [favoriteStories, setFavoriteStories] = useState(initialFavoriteStories);
   const [playHistory, setPlayHistory] = useState(initialPlayHistory);
   const [streakData, setStreakData] = useState(initialStreakData);
   const [listeningPatterns, setListeningPatterns] = useState(initialListeningPatterns);
   const [listeningStats, setListeningStats] = useState(initialListeningStats);
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
   
-  // Extract subscription tier
+  // Get user subscription tier
   const subscriptionTier = initialSubscriptionFeatures?.subscription_tier || 'free';
+  
+  // Last login date
+  const lastVisit = initialLastVisit ? new Date(initialLastVisit) : null;
 
   // Set mounted after hydration to avoid SSR/client hydration mismatch
   useEffect(() => {
@@ -122,12 +144,13 @@ export function DashboardContent({
     }
   }, [initialUserPreferences?.id]);
 
-  // Refresh all dashboard data
+  // Function to refresh all dashboard data
   const refreshDashboardData = async () => {
     // Refresh stories data
     await Promise.all([
       refetchStories(),
       refetchCount(),
+      refetchFavorites()
     ]);
     
     // Mock refresh for other data
@@ -140,6 +163,13 @@ export function DashboardContent({
   // Handle insights time range change
   const handleTimeRangeChange = (range: '7days' | '30days' | '90days' | 'all') => {
     setInsightsTimeRange(range);
+    // Track this interaction
+    trackDashboardInteraction(
+      initialUserPreferences?.id || 'anonymous',
+      'change_timerange',
+      { range }
+    ).catch(console.error);
+    
     // This would normally trigger a refetch with the new range
     setIsLoadingInsights(true);
     setTimeout(() => {
@@ -155,6 +185,30 @@ export function DashboardContent({
         action
       ).catch(console.error);
     }
+  };
+  
+  // Handle search
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    // Track search
+    if (query.length > 2) {
+      trackDashboardInteraction(
+        initialUserPreferences?.id || 'anonymous',
+        'search',
+        { query }
+      ).catch(console.error);
+    }
+  };
+  
+  // Handle filter changes
+  const handleFilterApply = (filters: any) => {
+    setSearchFilters(filters);
+    // Track filter usage
+    trackDashboardInteraction(
+      initialUserPreferences?.id || 'anonymous',
+      'apply_filters',
+      { filters }
+    ).catch(console.error);
   };
 
   // During hydration, use a simplified version based on the initial data
@@ -206,6 +260,26 @@ export function DashboardContent({
     progress: playHistory[0].progress || 0
   } : null;
 
+  // Use mobile layout for small screens
+  if (isMobile) {
+    return (
+      <>
+        <DashboardNavbar />
+        <MobileDashboard
+          userName={userName}
+          stories={stories}
+          favorites={favoriteStories}
+          playHistory={playHistory}
+          streakDays={streakData.currentStreak}
+          lastVisit={lastVisit}
+          isLoading={isLoadingStories || isLoadingCount || isLoadingFavorites || isLoadingInsights}
+          onRefresh={refreshDashboardData}
+        />
+      </>
+    );
+  }
+
+  // Desktop dashboard layout
   return (
     <>
       <DashboardNavbar />
@@ -215,7 +289,8 @@ export function DashboardContent({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <header className="mb-10 flex justify-between items-center">
+          {/* // Update the EnhancedSearchBar implementation in the header section */}
+          <header className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">
                 Hello, {userName.split(" ")[0] || "there"}!
@@ -224,31 +299,72 @@ export function DashboardContent({
                 Your personal story library and creation dashboard
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refreshDashboardData}
-              disabled={isLoadingStories || isLoadingCount || isLoadingInsights}
-              className="border-gray-700 hover:bg-gray-800"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingStories || isLoadingCount || isLoadingInsights ? 'animate-spin' : ''}`} />
-              {isLoadingStories || isLoadingCount || isLoadingInsights ? 'Refreshing...' : 'Refresh'}
-            </Button>
+            <div className="flex items-center space-x-2">
+              <EnhancedSearchBar
+                allStories={stories || []}
+                recentSearches={[]}
+                isLoading={isLoadingStories}
+                className="w-full sm:w-64 md:w-80"
+                onSearch={handleSearch}
+                onFilterApply={handleFilterApply}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshDashboardData}
+                disabled={isLoadingStories || isLoadingCount || isLoadingInsights}
+                className="border-gray-700 hover:bg-gray-800"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingStories || isLoadingCount || isLoadingInsights ? 'animate-spin' : ''}`} />
+                {isLoadingStories || isLoadingCount || isLoadingInsights ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </div>
           </header>
 
+          {/* Welcome Back Banner - only show for returning users with a last visit date */}
+          {showWelcome && lastVisit && (
+            <WelcomeBack
+              userName={userName}
+              lastVisit={lastVisit}
+              className="mb-6"
+              onDismiss={() => setShowWelcome(false)}
+            />
+          )}
+
           {/* Quick Actions */}
-          <QuickActions
+          {/* <QuickActions
             lastPlayedStory={lastPlayedStory}
             userPreferences={initialUserPreferences}
             favoritesCount={favoriteStories.length}
             subscriptionTier={subscriptionTier}
             onActionClick={handleActionClick}
-          />
-
-          {/* Main Content in Grid Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-            {/* Listening Insights - 1/3 width */}
-            <div className="lg:col-span-1">
+          /> */}
+          
+          {/* Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Left column - 2/3 width */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Story Categorization */}
+              <StoryCategorization
+                allStories={stories}
+                favoriteStories={favoriteStories}
+                recentlyPlayedStories={historyEntriesToStories(
+                    playHistory
+                  )}
+              />
+            </div>
+            
+            {/* Right column - 1/3 width */}
+            <div className="space-y-6">
+              {/* Recommendations */}
+              <StoryRecommendations
+                userId={initialUserPreferences?.id || 'anonymous'}
+                stories={stories}
+                isLoading={isLoadingStories}
+                onRefresh={refreshDashboardData}
+              />
+              
+              {/* Listening Insights */}
               <ListeningInsights
                 stats={listeningStats}
                 streak={streakData}
@@ -258,16 +374,27 @@ export function DashboardContent({
                 timeRange={insightsTimeRange}
                 onTimeRangeChange={handleTimeRangeChange}
               />
-            </div>
-            
-            {/* Story Categorization - 2/3 width */}
-            <div className="lg:col-span-2">
-              <StoryCategorization
-                allStories={stories}
-                favoriteStories={favoriteStories}
-                recentlyPlayedStories={historyEntriesToStories(
-                  playHistory
-                )}
+              
+              {/* Milestone Tracker */}
+              <MilestoneTracker
+                userId={initialUserPreferences?.id || 'anonymous'}
+                isLoading={isLoadingInsights}
+                initialMilestones={{
+                  totalStoriesListened: listeningStats.totalPlays,
+                  totalMinutesListened: Math.floor(listeningStats.totalDuration / 60),
+                  longestStreak: streakData.longestStreak,
+                  nextMilestone: {
+                    type: 'stories',
+                    current: listeningStats.totalPlays,
+                    target: listeningStats.totalPlays < 10 ? 10 : 
+                            listeningStats.totalPlays < 25 ? 25 : 
+                            listeningStats.totalPlays < 50 ? 50 : 100,
+                    progress: listeningStats.totalPlays < 10 ? listeningStats.totalPlays / 10 :
+                             listeningStats.totalPlays < 25 ? listeningStats.totalPlays / 25 :
+                             listeningStats.totalPlays < 50 ? listeningStats.totalPlays / 50 : 
+                             listeningStats.totalPlays / 100
+                  }
+                }}
               />
             </div>
           </div>

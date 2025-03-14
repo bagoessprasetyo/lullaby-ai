@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { createApiServices } from "@/lib/api/apiService";
-import { useStoryGenerationStatus } from "@/hooks/useWebSocket";
+import { generateStory, pollStoryStatus } from "@/lib/api/storyGeneration";
 import { useToast } from "@/components/ui/use-toast";
 import { useUpgradeModal } from "@/hooks/useUpgradeModal";
 import { rateLimiter } from "@/lib/rate-limiter";
@@ -36,115 +36,252 @@ export function AsyncStoryGenerator({ formData, onReset }: AsyncGeneratorProps) 
   const router = useRouter();
   const { toast } = useToast();
   const { openModal } = useUpgradeModal();
+  
   // State for generation process
-  const [requestId, setRequestId] = useState<string | null>(null);
+  const [storyId, setStoryId] = useState<string | null>(null);
+  const [status, setStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
+  const [progress, setProgress] = useState(0);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
-  
-  // Get generation status from WebSocket hook
-  const { 
-    status,
-    progress,
-    result,
-    error,
-    isConnected
-  } = useStoryGenerationStatus(requestId);
-  
-  // Services
-  const apiServices = createApiServices(session);
+  const [overallTimeout, setOverallTimeout] = useState<NodeJS.Timeout | null>(null);
   
   // Start generation when component mounts
-//   useEffect(() => {
-//     startGeneration();
-//   }, []);
-    useEffect(() => {
-        let isMounted = true;
-        const runGeneration = async () => {
-        if (isMounted) {
-            await startGeneration();
+  useEffect(() => {
+    let isMounted = true;
+    const runGeneration = async () => {
+      if (isMounted) {
+        await startGeneration();
+        
+        // Set an overall timeout for the entire generation process (3 minutes)
+        const timeout = setTimeout(() => {
+          if (isMounted && status !== 'completed') {
+            console.log('Generation timed out after 3 minutes');
+            
+            // If we have a storyId but generation is taking too long, redirect to story anyway
+            if (storyId) {
+              console.log(`Timing out, but we have a storyId (${storyId}). Redirecting...`);
+              toast({
+                title: "Story partially ready",
+                description: "Your story may not have audio yet, but you can view the text. Audio may be added shortly.",
+                variant: "default"
+              });
+              router.push(`/dashboard/stories/${storyId}`);
+            } else {
+              setGenerationError("Story generation is taking longer than expected. Please try again.");
+              setStatus('failed');
+            }
+          }
+        }, 3 * 60 * 1000); // 3 minutes
+        
+        setOverallTimeout(timeout);
+      }
+    };
+    
+    runGeneration();
+    
+    return () => {
+      isMounted = false;
+      
+      // Clear the timeout when unmounting
+      if (overallTimeout) {
+        clearTimeout(overallTimeout);
+      }
+    };
+  }, []); 
+  
+  // Poll for story status when we have a storyId
+  useEffect(() => {
+    if (!storyId) return;
+    
+    // Start polling for status
+    const stopPolling = pollStoryStatus(
+      storyId,
+      (storyData) => {
+        // Handle completion
+        if (storyData.success && storyData.audioUrl) {
+          setStatus('completed');
+          setProgress(1.0);
+          
+          // Navigate to story page after a brief delay
+          setTimeout(() => {
+            router.push(`/dashboard/stories/${storyId}`);
+          }, 1000);
         }
-        };
-        
-        runGeneration();
-        
-        return () => {
-        isMounted = false;
-        };
-    }, []); // Remove dependency on startGeneration to avoid circular reference
-  
-  // Watch for result changes
-  useEffect(() => {
-    if (result && status === 'completed') {
-      // Navigate to the new story page
-      router.push(`/dashboard/stories/${result.storyId}`);
-    }
-  }, [result, status, router]);
-  
-  // Watch for errors
-  useEffect(() => {
-    if (error || status === 'failed') {
-      setGenerationError(error || "Story generation failed. Please try again.");
-    }
-  }, [error, status]);
-  
-  // Display connected/disconnected toast
-  useEffect(() => {
-    if (!isConnected && requestId) {
-      toast({
-        title: "Connection Lost",
-        description: "Real-time updates disconnected. Status will refresh periodically.",
-        variant: "destructive"
-      });
-    }
-  }, [isConnected, requestId, toast]);
-  
-  // Start story generation
-  // const { openModal } = useUpgradeModal();
+      },
+      (progressValue, statusValue) => {
+        // Handle progress updates
+        setProgress(progressValue);
+        setStatus(statusValue as any);
+      }
+    );
+    
+    // Clean up polling when unmounted
+    return () => {
+      stopPolling();
+    };
+  }, [storyId, router]);
 
-  // Modified startGeneration function
+  // Start story generation
   const startGeneration = useCallback(async () => {
     try {
       setIsStarting(true);
-      setRequestId(null);
+      setStoryId(null);
       setGenerationError(null);
+      setStatus('pending');
+      setProgress(0.05);
 
-      // Check rate limit
-      const { success } = await rateLimiter.limit(session?.user?.id || 'anonymous');
-      if (!success) {
-        throw new Error('You can generate up to 5 stories per minute. Please wait before creating more.');
+      // Skip the rate limiter check in the client, let the server handle it
+      /*
+      // This was causing the issue - we'll handle rate limiting on the server side only
+      try {
+        const { success } = await rateLimiter.limit(session?.user?.id || 'anonymous');
+        if (!success) {
+          throw new Error('You can generate up to 5 stories per minute. Please wait before creating more.');
+        }
+      } catch (rateLimitError) {
+        console.error("Rate limit error:", rateLimitError);
+        const message = rateLimitError instanceof Error ? rateLimitError.message : "Rate limit exceeded";
+        if (message.includes('5 stories per minute')) {
+          setGenerationError(message);
+          openModal('story-generation');
+        } else {
+          setGenerationError(message);
+        }
+        setStatus('failed');
+        setIsStarting(false);
+        return;
       }
-
-      // Get current URL for callback
-      const origin = window.location.origin;
-      const callbackUrl = `${origin}/api/webhooks/story-completed`;
+      */
       
-      // Call API to start async generation
-      const response = await apiServices.story.generateStoryAsync(formData, callbackUrl) as GenerateStoryResponse & { requestId?: string };
-      
-      if (response.success && response.requestId) {
-        setRequestId(response.requestId);
-      } else {
-        throw new Error(response.error || "Failed to start generation");
+      try {
+        // Make a direct fetch request instead of using the helper function
+        console.log("Preparing story generation request...");
+        
+        // Convert images to base64
+        const imagePromises = formData.images.map(file => {
+          return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        });
+        
+        const images = await Promise.all(imagePromises);
+        console.log(`Processed ${images.length} images for upload`);
+        
+        // Convert characters to the format expected by the API
+        const characters = formData.characters.map(character => ({
+          name: character.name,
+          description: character.description,
+        }));
+        
+        // Prepare the request payload
+        const payload = {
+          images,
+          characters,
+          theme: formData.theme,
+          duration: formData.duration,
+          language: formData.language,
+          backgroundMusic: formData.backgroundMusic,
+          voice: formData.voice,
+          userId: session?.user?.id || 'anonymous',
+        };
+        
+        console.log("Sending direct fetch request to generate story...");
+        
+        // Log the request with placeholders (don't log the actual image data)
+        console.log("Sending request with payload:", {
+          ...payload,
+          images: images.map((_, i) => `[Image ${i+1}]`)
+        });
+        
+        // Make the API request with actual image data
+        const response = await fetch('/api/stories/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Server error (${response.status}):`, errorText);
+          
+          // Try to parse error JSON if possible
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (response.status === 429) {
+              // Handle rate limiting specifically
+              setGenerationError('You can generate up to 5 stories per minute. Please wait before creating more.');
+              openModal('story-generation');
+              setStatus('failed');
+              setIsStarting(false);
+              return; // Early return, don't proceed
+            } else {
+              throw new Error(errorJson.error || `Server error: ${response.status}`);
+            }
+          } catch (parseError) {
+            // If error response is not valid JSON
+            console.error("Failed to parse error response:", parseError);
+            throw new Error(`Server returned status ${response.status}: ${errorText.substring(0, 100)}`);
+          }
+        }
+        
+        // Get response as text first to log it
+        const responseText = await response.text();
+        console.log("Raw API response:", responseText);
+        
+        // Parse the response manually
+        let jsonResponse;
+        try {
+          jsonResponse = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error("Failed to parse response as JSON:", parseError);
+          throw new Error("The server returned an invalid response format. Please try again.");
+        }
+        
+        if (jsonResponse.success && jsonResponse.storyId) {
+          setStoryId(jsonResponse.storyId);
+          setStatus('processing');
+          setProgress(0.3);
+          console.log(`Successfully started story generation with ID: ${jsonResponse.storyId}`);
+        } else {
+          throw new Error(jsonResponse.error || "Failed to start generation");
+        }
+      } catch (apiError) {
+        console.error("API error during story generation:", apiError);
+        
+        // Check for specific error types
+        const errorMessage = apiError instanceof Error ? apiError.message : "Unknown error";
+        if (errorMessage.includes('JSON.parse') || errorMessage.includes('invalid JSON') || 
+            errorMessage.includes('invalid response format')) {
+          setGenerationError("The server returned an invalid response. This is often caused by temporary issues with the AI service. Please try again.");
+        } else {
+          setGenerationError(errorMessage);
+        }
+        setStatus('failed');
       }
     } catch (error) {
       console.error("Error starting generation:", error);
       const message = error instanceof Error ? error.message : "Failed to start story generation";
-      
-      if (message.includes('You can generate up to 5 stories per minute')) {
-        setGenerationError(message);
-        openModal('story-generation');
-      } else {
-        setGenerationError(message);
-      }
+      setGenerationError(message);
+      setStatus('failed');
     } finally {
       setIsStarting(false);
     }
-  }, [session?.user?.id, apiServices.story, formData, openModal]);
+  }, [session, formData, openModal, router]);
   
   // Get current step description
   const getStepDescription = () => {
     if (status === 'pending') return "Preparing to create your story...";
     if (status === 'failed') return "Story generation failed.";
+    
+    // If we've been waiting a long time, show a different message
+    if (progress > 0.85 && !storyId) {
+      return "Almost there! Finalizing your story...";
+    }
     
     if (progress < 0.2) return "Analyzing your images...";
     if (progress < 0.4) return "Crafting your story...";
@@ -175,10 +312,10 @@ export function AsyncStoryGenerator({ formData, onReset }: AsyncGeneratorProps) 
           {getStepDescription()}
         </p>
         
-        {!isConnected && requestId && (
-          <p className="text-xs text-amber-400 mt-1">
+        {progress > 0 && progress < 1 && status === 'processing' && (
+          <p className="text-xs text-indigo-400 mt-1">
             <RefreshCw className="h-3 w-3 inline-block mr-1 animate-spin" />
-            Connection lost. Updates may be delayed.
+            Processing your story...
           </p>
         )}
       </div>
@@ -262,10 +399,9 @@ export function AsyncStoryGenerator({ formData, onReset }: AsyncGeneratorProps) 
       {/* Generation details (can be expanded for debugging) */}
       {process.env.NODE_ENV === 'development' && (
         <div className="mt-8 text-xs text-gray-500 max-w-md mx-auto">
-          <p>Request ID: {requestId || 'Not started'}</p>
+          <p>Story ID: {storyId || 'Not started'}</p>
           <p>Status: {status}</p>
           <p>Progress: {Math.round(progress * 100)}%</p>
-          <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
         </div>
       )}
     </div>

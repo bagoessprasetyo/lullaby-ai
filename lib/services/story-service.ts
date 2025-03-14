@@ -289,11 +289,13 @@ export async function getRecentStories(userId: string, limit = 3) {
     // Direct query with logging
     console.log("[SERVICE] Executing query: stories.select().eq('user_id', userId).order('created_at', { ascending: false }).limit(limit)");
     const { data, error } = await client
-      .from('public.stories')
-      .select('*, images(storage_path, sequence_index)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    .from('stories')
+    .select(`
+      *,
+      images(id, storage_path, sequence_index)
+    `)
+    .order('sequence_index', { foreignTable: 'images' })
+    .limit(limit);
     
     console.log("[SERVICE] Stories query result:", { 
       userId,

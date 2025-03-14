@@ -2,7 +2,8 @@
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { Session } from "next-auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use relative URLs for API endpoints since we're hosting them in the same app
+const API_URL = '';
 
 /**
  * Base API client with common functionality
