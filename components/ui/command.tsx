@@ -8,23 +8,20 @@ import { Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 
-// The issue might be with the forwardRef type definition
-// Alternative fix for the Command component
-type CommandPrimitiveElement = React.ElementRef<typeof CommandPrimitive>
-type CommandPrimitiveProps = React.ComponentPropsWithoutRef<typeof CommandPrimitive>
-
-const Command = React.forwardRef<CommandPrimitiveElement, CommandPrimitiveProps>(
-  ({ className, ...props }, ref) => (
-    <CommandPrimitive
-      ref={ref}
-      className={cn(
-        "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-)
+// Fix with a simpler approach
+const Command = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive
+    ref={ref}
+    className={cn(
+      "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
+      className
+    )}
+    {...props}
+  />
+))
 Command.displayName = CommandPrimitive.displayName
 
 const CommandDialog = ({ children, ...props }: DialogProps) => {
