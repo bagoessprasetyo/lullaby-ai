@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "vercel-build": "rm -rf .next && next build"
   },
   "dependencies": {
     "@custom-react-hooks/use-media-query": "^1.5.1",
