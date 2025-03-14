@@ -6,6 +6,29 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Play, Pause, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Define types for the voice object
+interface VoiceLabel {
+  accent?: string;
+  description?: string;
+  use_case?: string;
+}
+
+interface Voice {
+  voice_id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  preview_url?: string;
+  labels?: VoiceLabel;
+}
+
+// Define props interface
+interface ElevenLabsVoiceSelectorProps {
+  selectedVoice: string | null;
+  onVoiceChange: (voiceId: string) => void;
+  error?: string | null;
+}
+
 /**
  * Component to fetch and display voices from ElevenLabs API
  */
@@ -13,12 +36,12 @@ export function ElevenLabsVoiceSelector({
   selectedVoice, 
   onVoiceChange, 
   error 
-}) {
-  const [voices, setVoices] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [apiError, setApiError] = useState(null);
-  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
-  const [audioRef, setAudioRef] = useState(null);
+}: ElevenLabsVoiceSelectorProps) {
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
+  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
 
   // Fetch voices from ElevenLabs API
   useEffect(() => {
@@ -39,7 +62,7 @@ export function ElevenLabsVoiceSelector({
         }
         
         // Filter voices to include only those with appropriate labels
-        const filteredVoices = data.voices.filter(voice => {
+        const filteredVoices = data.voices.filter((voice: Voice) => {
           // Include voices marked as professional or that have specific kid-friendly labels
           return voice.category === 'professional' || 
                  (voice.labels && (
@@ -57,7 +80,7 @@ export function ElevenLabsVoiceSelector({
         }
       } catch (err) {
         console.error('Error fetching voices:', err);
-        setApiError(err.message);
+        setApiError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setIsLoading(false);
       }
@@ -72,10 +95,10 @@ export function ElevenLabsVoiceSelector({
         audioRef.src = '';
       }
     };
-  }, []);
+  }, [selectedVoice, onVoiceChange]);
 
   // Function to play voice sample
-  const playVoiceSample = async (voiceId) => {
+  const playVoiceSample = async (voiceId: string) => {
     try {
       // If already playing, stop it
       if (currentlyPlaying === voiceId) {
@@ -123,7 +146,7 @@ export function ElevenLabsVoiceSelector({
   };
 
   // Handle voice selection
-  const handleVoiceChange = (voiceId) => {
+  const handleVoiceChange = (voiceId: string) => {
     onVoiceChange(voiceId);
   };
 
@@ -150,7 +173,7 @@ export function ElevenLabsVoiceSelector({
   return (
     <div className="space-y-4">
       <RadioGroup 
-        value={selectedVoice} 
+        value={selectedVoice || ''} 
         onValueChange={handleVoiceChange}
         className="space-y-3"
       >
