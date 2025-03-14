@@ -176,9 +176,8 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
-        domain: process.env.NODE_ENV === "production" ? ".lullaby-ai.com" : undefined, // Add your domain
-      },
+        secure: process.env.NODE_ENV === "production"
+      }
     },
   },
 

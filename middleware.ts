@@ -4,9 +4,11 @@ import { withAuth } from "next-auth/middleware";
 
 export default withAuth(
   function middleware(req) {
-    // Debug logging
+    // Enhanced debug logging
     console.log("[MIDDLEWARE] Request path:", req.nextUrl.pathname);
     console.log("[MIDDLEWARE] Auth token present:", !!req.nextauth?.token);
+    console.log("[MIDDLEWARE] Request cookies:", Object.keys(req.cookies).join(', '));
+    console.log("[MIDDLEWARE] Request headers:", Object.fromEntries(req.headers));
     
     // If token exists but still redirecting, there's a session issue
     if (req.nextauth?.token) {
