@@ -9,13 +9,15 @@ import { rateLimiter } from '@/lib/rate-limiter';
 import { analyzeImagesWithOpenAI, generateStoryWithOpenAI, generateTitleForStory } from '@/lib/openai';
 import { buildEnhancedStoryPrompt } from '@/lib/story-generation';
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
-});
+// Move Cloudinary configuration to runtime
+const configureCloudinary = () => {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true
+  });
+};
 
 // Duration lengths in words
 const DURATION_LENGTHS = {
@@ -26,6 +28,9 @@ const DURATION_LENGTHS = {
 
 export async function POST(req: NextRequest) {
   try {
+    // Configure Cloudinary at runtime instead of during build
+    configureCloudinary();
+    
     console.log('[API] Story generation request received');
     
     // Check authentication
