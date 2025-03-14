@@ -26,6 +26,17 @@ const DURATION_LENGTHS = {
   long: 900,  // ~6 minutes
 };
 
+// Add this GET handler at the top of your file
+export async function GET() {
+  // This is just a placeholder to make Vercel's build process happy
+  // It will never be called in production, only during build
+  return new Response(JSON.stringify({ message: "This endpoint only accepts POST requests" }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+// Your existing POST handler remains unchanged
 export async function POST(req: NextRequest) {
   try {
     // Configure Cloudinary at runtime instead of during build
