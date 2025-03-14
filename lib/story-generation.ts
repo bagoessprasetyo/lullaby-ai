@@ -121,9 +121,9 @@ export function buildEnhancedStoryPrompt({
   }
   
   // Get configurations
-  const languageConfig = LANGUAGE_CONFIG[language] || LANGUAGE_CONFIG.english;
-  const themeDesc = THEME_DESCRIPTIONS[theme] || THEME_DESCRIPTIONS.adventure;
-  const durationConfig = DURATION_CONFIG[duration] || DURATION_CONFIG.medium;
+  const languageConfig = LANGUAGE_CONFIG[language as keyof typeof LANGUAGE_CONFIG] || LANGUAGE_CONFIG.english;
+  const themeDesc = THEME_DESCRIPTIONS[theme as keyof typeof THEME_DESCRIPTIONS] || THEME_DESCRIPTIONS.adventure;
+  const durationConfig = DURATION_CONFIG[duration as keyof typeof DURATION_CONFIG] || DURATION_CONFIG.medium;
   
   // Build prompt
   return `${languageConfig.prompt_prefix} bedtime story for children featuring these characters: ${names.join(', ')}

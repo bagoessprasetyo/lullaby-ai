@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     } catch (fetchError) {
       clearTimeout(timeoutId);
       
-      if (fetchError.name === 'AbortError') {
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         console.error('[TTS API] Request timed out after 60 seconds');
         return NextResponse.json(
           { success: false, error: 'ElevenLabs request timed out after 60 seconds' },
