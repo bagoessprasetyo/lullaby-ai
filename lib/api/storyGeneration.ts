@@ -143,7 +143,7 @@ async function triggerAudioGeneration(storyId: string): Promise<void> {
       },
       body: JSON.stringify({ storyId }),
       // Add a longer timeout as audio generation can take time
-      timeout: 10000,  // 10 seconds just for the trigger call
+      signal: AbortSignal.timeout(10000), // 10 seconds just for the trigger call
     });
 
     console.log(`Audio webhook response status: ${response.status}`);
@@ -296,8 +296,8 @@ export function pollStoryStatus(
     } catch (error) {
       console.error("Error polling story status:", error);
       
-      if (attempts < MAX_POLLING_ATTEMPTS && isPolling) {
-        console.log(`Retrying after error (attempt ${attempts}/${MAX_POLLING_ATTEMPTS})`);
+      if (attempts < 15 && isPolling) {
+        console.log(`Retrying after error (attempt ${attempts}/15)`);
         setTimeout(checkStatus, 3000); // Try again after 3 seconds
       } else {
         console.log(`Stopping polling due to errors after ${attempts} attempts`);

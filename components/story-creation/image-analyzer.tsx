@@ -124,7 +124,7 @@ export function ImageAnalyzer({
       // Theme suggestion
       if (data.suggestions.theme?.suggestion) {
         // Get detailed analysis for better description
-        const themeDetails = data.results.map(result => 
+        const themeDetails = data.results.map((result: { analysis: { deepseek: { themes: any; }; }; }) => 
           result.analysis.deepseek?.themes || []
         ).flat().filter(Boolean);
         
@@ -143,12 +143,12 @@ export function ImageAnalyzer({
       // Duration suggestion
       if (data.suggestions.duration?.suggestion) {
         // Get subject counts for better duration explanation
-        const subjectCounts = data.results.map(result => 
+        const subjectCounts = data.results.map((result: { analysis: { deepseek: { subjects: any; }; }; }) => 
           (result.analysis.deepseek?.subjects || []).length
         );
         
         const avgSubjects = subjectCounts.length > 0 
-          ? subjectCounts.reduce((sum, count) => sum + count, 0) / subjectCounts.length 
+          ? subjectCounts.reduce((sum: any, count: any) => sum + count, 0) / subjectCounts.length 
           : 0;
         
         let durationReason = `Based on image content, a ${data.suggestions.duration.suggestion} story is recommended`;
