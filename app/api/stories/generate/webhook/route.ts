@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
 }
 
 // Generate audio using ElevenLabs API
-async function generateAudioWithElevenLabs(text, voiceId = 'default') {
+async function generateAudioWithElevenLabs(text: string, voiceId = 'default') {
   console.log(`[WEBHOOK] Generating audio with ElevenLabs for voice ${voiceId}`);
   
   try {
@@ -190,7 +190,7 @@ async function generateAudioWithElevenLabs(text, voiceId = 'default') {
     }
     
     // Map voice selection to ElevenLabs voice IDs
-    const voiceMap = {
+    const voiceMap: Record<string, string> = {
       default: '21m00Tcm4TlvDq8ikWAM', // Rachel
       female: '21m00Tcm4TlvDq8ikWAM',  // Rachel
       male: 'AZnzlk1XvdvUeBnXmlld',    // Sam
@@ -269,20 +269,20 @@ async function generateAudioWithElevenLabs(text, voiceId = 'default') {
     const audioBase64 = Buffer.from(audioBuffer).toString('base64');
     return `data:audio/mpeg;base64,${audioBase64}`;
   } catch (fetchError) {
-    clearTimeout(timeoutId);
+    // No need to clear timeout as it's handled by Promise.race
     
-    if (fetchError.name === 'AbortError') {
+    if (fetchError instanceof Error && fetchError.name === 'AbortError') {
       console.error('[WEBHOOK] ElevenLabs API request timed out after 120 seconds');
       throw new Error('Audio generation timed out');
     }
     
     console.error('[WEBHOOK] ElevenLabs API fetch error:', fetchError);
-    throw new Error(`ElevenLabs API error: ${fetchError.message}`);
+    throw new Error(`ElevenLabs API error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
   }
 }
 
 // Improved Cloudinary upload function with better error handling
-async function uploadAudioToCloudinaryImproved(audioDataUrl, storyId) {
+async function uploadAudioToCloudinaryImproved(audioDataUrl: string, storyId: any) {
   console.log(`[WEBHOOK] Uploading audio to Cloudinary for story ${storyId}`);
   
   try {
@@ -326,9 +326,8 @@ async function uploadAudioToCloudinaryImproved(audioDataUrl, storyId) {
           timeout: 120000, // 120 second upload timeout
           format: 'mp3', // Force MP3 format
           audio: {
-            codec: 'mp3', // Ensure MP3 encoding
-          },
-          notification_url: null, // Disable notifications
+            codec: 'mp3' // Ensure MP3 encoding
+          }
         });
         resolve(result);
       } catch (err) {
@@ -344,21 +343,21 @@ async function uploadAudioToCloudinaryImproved(audioDataUrl, storyId) {
     const uploadResult = await Promise.race([uploadPromise, timeoutPromise]);
     console.timeEnd('cloudinary-upload');
     
-    console.log(`[WEBHOOK] Audio uploaded to Cloudinary: ${uploadResult.secure_url}`);
-    console.log(`[WEBHOOK] Audio duration: ${uploadResult.duration || 'unknown'} seconds`);
-    console.log(`[WEBHOOK] Audio format: ${uploadResult.format || 'unknown'}`);
-    console.log(`[WEBHOOK] Audio size: ${uploadResult.bytes || 'unknown'} bytes`);
+    console.log(`[WEBHOOK] Audio uploaded to Cloudinary: ${(uploadResult as any).secure_url}`);
+    console.log(`[WEBHOOK] Audio duration: ${(uploadResult as any).duration || 'unknown'} seconds`);
+    console.log(`[WEBHOOK] Audio format: ${(uploadResult as any).format || 'unknown'}`);
+    console.log(`[WEBHOOK] Audio size: ${(uploadResult as any).bytes || 'unknown'} bytes`);
     
     // Validate upload result
-    if (!uploadResult.secure_url) {
+    if (!(uploadResult as any).secure_url) {
       throw new Error('Cloudinary did not return a secure URL');
     }
     
     return {
-      secure_url: uploadResult.secure_url,
-      duration: uploadResult.duration || 30, // Duration in seconds
-      format: uploadResult.format || 'mp3',
-      bytes: uploadResult.bytes || 0
+      secure_url: (uploadResult as any).secure_url,
+      duration: (uploadResult as any).duration || 30, // Duration in seconds
+      format: (uploadResult as any).format || 'mp3',
+      bytes: (uploadResult as any).bytes || 0
     };
   } catch (error) {
     console.error('[WEBHOOK] Error uploading audio to Cloudinary:', error);
@@ -367,7 +366,7 @@ async function uploadAudioToCloudinaryImproved(audioDataUrl, storyId) {
 }
 
 // Function to update the story with audio information
-async function updateStoryWithAudio(storyId, audioUrl, duration) {
+async function updateStoryWithAudio(storyId: any, audioUrl: any, duration: any) {
   console.log(`[WEBHOOK] Updating story ${storyId} with audio URL: ${audioUrl}`);
   
   try {

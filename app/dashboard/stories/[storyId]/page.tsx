@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { getStoryById } from "@/lib/services/story-service";
 import { auth } from "@/auth";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
-import StoryViewer from "./story-viewer"; 
+// import StoryViewer from "./story-viewer"; 
 import { Suspense } from "react";
 import { StorySkeletonLoader } from "@/components/story-playback/story-skeleton";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth.config";
+import StoryViewer from "@/components/story-playback/story-viewer";
 
 export default async function StoryPage({
   params,

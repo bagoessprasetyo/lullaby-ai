@@ -22,7 +22,7 @@ import { StoryDetailsStep } from "@/components/story-creation/story-details-step
 import { NarrationSettingsStep } from "@/components/story-creation/narration-settings-step";
 // Import our enhanced review step - we're directly replacing the old one
 import { ReviewStep } from "@/components/story-creation/review-step";
-import { AsyncStoryGenerator } from "@/components/story-creation/async-generator";
+import { EnhancedStoryGenerator } from "@/components/story-creation/async-generator";
 import { useSubscription } from "@/hooks/useSubscription";
 import { QuickStartTemplates } from "@/components/story-creation/quick-start-templates";
 
@@ -265,7 +265,7 @@ export default function StoryCreationPage() {
         <div className="my-8">
           <Card className="bg-gray-900 border-gray-800 p-6">
             {formData.isGenerating ? (
-              <AsyncStoryGenerator 
+              <EnhancedStoryGenerator 
                 formData={formData}
                 onReset={handleResetGeneration}
               />

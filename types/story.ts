@@ -1,4 +1,29 @@
 // types/story.ts
+
+export interface StoryImage {
+  id: string;
+  storage_path: string;
+  sequence_index?: number;
+  upload_date?: string;
+}
+
+export interface StoryPage {
+  id: string;
+  text: string;
+  imageUrl?: string;
+  audioUrl?: string;
+}
+
+export interface StorySummary {
+  id: string;
+  title: string;
+  theme: string;
+  language: string;
+  duration?: number;
+  created_at: string;
+  cover_image?: string;
+}
+
 export interface Story {
   id: string;
   user_id: string;
@@ -23,82 +48,45 @@ export interface Story {
   characters?: any[];
   tags?: string[];
   images?: StoryImage[];
+  // Enhanced functionality
+  pages?: StoryPage[];
 }
 
-// types/story.ts
-
-// export interface Story {
-//   id: string;
-//   title: string;
-//   coverImage: string;
-//   thumbnail: string;
-//   duration: number;
-//   language: string;
-//   createdAt: Date;
-//   isFavorite: boolean;
-//   backgroundMusic?: string;
-//   characters: string[];
-//   tags: string[];
-// }
-
-export interface DBStory {
-  id: string;
-  user_id: string;
-  title: string;
-  text_content?: string;
-  language: string;
-  duration?: number;
-  audio_url?: string;
-  theme?: string;
-  created_at: string;
-  is_favorite: boolean;
-  play_count?: number;
-  background_music_id?: string;
-  voice_profile_id?: string;
-  storage_path?: string;
-  images?: {
-    id: string;
-    story_id: string;
-    user_id: string;
-    storage_path: string;
-    upload_date: string;
-    analysis_result?: any;
-    sequence_index: number;
-  }[];
+export interface StoryWithPagination extends Story {
+  pages: StoryPage[];
 }
 
-export type CreateStoryInput = {
-  title: string;
-  language: string;
-  theme?: string;
-};
-
-export type UpdateStoryInput = {
-  title?: string;
-  text_content?: string;
-  language?: string;
-  theme?: string;
-};
-
-export interface StoryImage {
+export interface BackgroundMusic {
   id: string;
-  story_id: string;
-  user_id: string;
-  storage_path: string;
-  upload_date: string;
-  analysis_result?: any;
-  sequence_index: number;
-}
-
-export interface StoryCharacter {
-  id: string;
-  story_id: string;
   name: string;
-  description: string | null;
+  url: string;
+  category: string;
+  duration: number;
 }
 
-export interface StoryTag {
+export interface Character {
   id: string;
-  story_id: string;
-  tag: string;
+  name: string;
+  description: string;
+}
+
+export interface StoryCreationOptions {
+  title: string;
+  theme: string;
+  language: string;
+  duration: string;
+  characters: { name: string; description: string }[];
+  images: File[];
+  voice: string;
+  backgroundMusic?: string;
+}
+
+export interface StoryPlayerOptions {
+  showSettings?: boolean;
+  autoPlay?: boolean;
+  showTranscript?: boolean;
+  loop?: boolean;
+  volume?: number;
+  speed?: number;
+  theme?: "light" | "dark";
 }

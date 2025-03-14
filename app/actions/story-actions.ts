@@ -1,22 +1,24 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { supabase } from '@/lib/supabase';
+import { getAdminClient, supabase } from '@/lib/supabase';
 import { auth } from '@/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/auth.config';
 // import { auth } from '@/lib/auth';
 
 /**
  * Toggle the favorite status of a story
  */
 export async function toggleFavoriteAction(storyId: string, isFavorite: boolean) {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   
   if (!session?.user?.id) {
     throw new Error('You must be logged in to perform this action');
   }
-  
+  const client = typeof window === 'undefined' ? getAdminClient() : supabase;
   // Check if user owns the story
-  const { data: story, error: storyError } = await supabase
+  const { data: story, error: storyError } = await client
     .from('stories')
     .select('user_id')
     .eq('id', storyId)
@@ -29,9 +31,9 @@ export async function toggleFavoriteAction(storyId: string, isFavorite: boolean)
   if (story.user_id !== session.user.id) {
     throw new Error('You do not have permission to modify this story');
   }
-  
+  // const client = typeof window === 'undefined' ? getAdminClient() : supabase;
   // Update favorite status
-  const { error } = await supabase
+  const { error } = await client
     .from('stories')
     .update({ is_favorite: isFavorite })
     .eq('id', storyId);
@@ -51,14 +53,14 @@ export async function toggleFavoriteAction(storyId: string, isFavorite: boolean)
  * Delete a story
  */
 export async function deleteStoryAction(storyId: string) {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   
   if (!session?.user?.id) {
     throw new Error('You must be logged in to perform this action');
   }
-  
+  const client = typeof window === 'undefined' ? getAdminClient() : supabase;
   // Check if user owns the story
-  const { data: story, error: storyError } = await supabase
+  const { data: story, error: storyError } = await client
     .from('stories')
     .select('user_id')
     .eq('id', storyId)
@@ -71,9 +73,9 @@ export async function deleteStoryAction(storyId: string) {
   if (story.user_id !== session.user.id) {
     throw new Error('You do not have permission to delete this story');
   }
-  
+  // const client = typeof window === 'undefined' ? getAdminClient() : supabase;
   // Delete the story (cascade will handle related records)
-  const { error } = await supabase
+  const { error } = await client
     .from('stories')
     .delete()
     .eq('id', storyId);
@@ -97,14 +99,14 @@ export async function createStoryAction(storyData: {
   language: string;
   theme?: string;
 }) {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   
   if (!session?.user?.id) {
     throw new Error('You must be logged in to perform this action');
   }
-  
+  const client = typeof window === 'undefined' ? getAdminClient() : supabase;
   // Insert new story
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('stories')
     .insert({
       user_id: session.user.id,

@@ -194,7 +194,7 @@ async function analyzeWithHuggingFace(imageUrl: string, hfApiKey: string) {
   const descriptionLower = description.toLowerCase();
   
   // Extract subjects/characters
-  let subjects = [];
+  let subjects: string[] = [];
   const characterTerms = ['person', 'people', 'child', 'boy', 'girl', 'man', 'woman', 
                          'dog', 'cat', 'animal', 'bear', 'rabbit'];
                          
@@ -293,7 +293,7 @@ async function analyzeWithHuggingFace(imageUrl: string, hfApiKey: string) {
   }
   
   // Extract details by finding nouns that aren't subjects or setting
-  let details = [];
+  let details: string[] = [];
   const detailTerms = ['tree', 'flower', 'sun', 'moon', 'star', 'water', 'river', 'book',
                        'toy', 'ball', 'cloud', 'rainbow', 'door', 'window', 'light'];
                        
@@ -506,7 +506,7 @@ function generateSuggestionsFromDeepSeek(analysisResults: any[]) {
   
   deepseekAnalyses.forEach(analysis => {
     if (analysis.subjects && Array.isArray(analysis.subjects)) {
-      analysis.subjects.forEach(subject => {
+      analysis.subjects.forEach((subject: any) => {
         if (typeof subject === 'string') {
           // Filter out common non-character objects
           const nonCharacterKeywords = ['sky', 'sun', 'building', 'tree', 'house', 'car', 'road', 'wall'];

@@ -1,3 +1,4 @@
+// components/story-creation/async-generator-enhanced.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { StoryAudioPlayer } from "./story-audio-player";
-import { generateStoryAudio } from "@/lib/elevenlabs";
 import {
   CheckCircle2,
   FileText,
@@ -20,16 +20,17 @@ import {
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { cn } from "@/lib/utils";
 
-interface AsyncStoryGeneratorProps {
+// Enhanced interface that includes image analysis data
+interface EnhancedStoryGeneratorProps {
   formData: StoryFormData;
   onReset: () => void;
 }
 
-export function AsyncStoryGenerator({
+export function EnhancedStoryGenerator({
   formData,
   onReset
-}: AsyncStoryGeneratorProps) {
-  const [status, setStatus] = useState<"pending" | "generating" | "audio" | "completed" | "error">("pending");
+}: EnhancedStoryGeneratorProps) {
+  const [status, setStatus] = useState<"pending" | "analyzing" | "generating" | "audio" | "completed" | "error">("pending");
   const [progress, setProgress] = useState(0);
   const [story, setStory] = useState<{
     id: string;
@@ -37,6 +38,7 @@ export function AsyncStoryGenerator({
     content: string;
     audioUrl: string | null;
   } | null>(null);
+  const [imageAnalysis, setImageAnalysis] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
@@ -46,11 +48,22 @@ export function AsyncStoryGenerator({
     generateStory();
   }, []);
 
-  // Function to generate the story
+  // Function to convert File to base64
+  const fileToBase64 = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  // Function to generate the story with our enhanced process
   const generateStory = async () => {
-    console.log('[Story Generator] Starting story generation process');
+    console.log('[Story Generator] Starting enhanced story generation process');
     try {
-      setStatus("generating");
+      // Initial state setup
+      setStatus("analyzing");
       setProgress(10);
       setError(null);
       setErrorDetails(null);
@@ -62,6 +75,21 @@ export function AsyncStoryGenerator({
 
       setProgress(20);
       console.log('[Story Generator] Images converted successfully');
+
+      // Do image analysis first (optional separate step)
+      setStatus("analyzing");
+      console.log('[Story Generator] Analyzing images');
+      
+      try {
+        // We could call a separate analysis endpoint here if needed
+        // For now, we'll let the generate API handle the analysis
+        // This is a placeholder for the analysis step visualization
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setProgress(30);
+      } catch (analysisError) {
+        console.error('[Story Generator] Image analysis error:', analysisError);
+        // Continue without specific analysis data
+      }
 
       // Prepare request payload
       const payload = {
@@ -82,10 +110,12 @@ export function AsyncStoryGenerator({
         characterCount: payload.characters.length
       });
 
-      setProgress(30);
+      // Start story generation
+      setStatus("generating");
+      setProgress(40);
 
       // Send API request to generate story
-      console.log('[Story Generator] Sending request to story generation API');
+      console.log('[Story Generator] Sending request to enhanced story generation API');
       console.time('story-generation');
       
       const response = await fetch('/api/stories/generate', {
@@ -99,10 +129,8 @@ export function AsyncStoryGenerator({
       console.timeEnd('story-generation');
       console.log(`[Story Generator] API response status: ${response.status}`);
 
-      setProgress(60);
-
+      // Handle errors in API response
       if (!response.ok) {
-        // Get error details for debugging
         let errorResponse;
         try {
           errorResponse = await response.json();
@@ -115,6 +143,7 @@ export function AsyncStoryGenerator({
         throw new Error(errorResponse.error || `Error: ${response.status}`);
       }
 
+      // Process successful response
       const data = await response.json();
       console.log('[Story Generator] Story generation successful:', {
         storyId: data.storyId,
@@ -137,64 +166,64 @@ export function AsyncStoryGenerator({
         audioUrl: data.audioUrl || null
       });
 
-      // If the story doesn't already have audio, generate it
-      if (!data.audioUrl) {
-        setStatus("audio");
-        console.log('[Story Generator] Story doesn\'t have audio, starting TTS generation');
-        
-        try {
-          const audioUrl = await generateAudio(data.textContent, formData.voice);
-          
-          // Update story with audio URL
-          setStory(prev => prev ? { ...prev, audioUrl } : null);
-          setStatus("completed");
-          setProgress(100);
-          console.log('[Story Generator] TTS generation successful');
-        } catch (audioError) {
-          console.error('[Story Generator] TTS generation failed:', audioError);
-          setError(`Failed to generate audio narration: ${audioError instanceof Error ? audioError.message : 'Unknown error'}`);
-          setErrorDetails('The story text was generated successfully, but we couldn\'t create the audio narration. Please try again or contact support if the problem persists.');
-          setStatus("error");
-        }
-      } else {
+      // If we have audio, we're done
+      if (data.audioUrl) {
         setStatus("completed");
         setProgress(100);
-        console.log('[Story Generator] Story already has audio, marking as completed');
+        console.log('[Story Generator] Story complete with audio');
+      } else {
+        // Otherwise wait for audio generation
+        setStatus("audio");
+        console.log('[Story Generator] Waiting for audio generation');
+        
+        // Poll for audio every 5 seconds for up to 2 minutes
+        let attempts = 0;
+        const maxAttempts = 24; // 2 minutes at 5 second intervals
+        
+        const checkAudio = async () => {
+          try {
+            const audioResponse = await fetch(`/api/stories/${data.storyId}`);
+            if (audioResponse.ok) {
+              const storyData = await audioResponse.json();
+              
+              if (storyData.audioUrl) {
+                // Audio is ready
+                setStory(prev => prev ? { ...prev, audioUrl: storyData.audioUrl } : null);
+                setStatus("completed");
+                setProgress(100);
+                console.log('[Story Generator] Audio generation completed');
+                return true;
+              }
+            }
+          } catch (e) {
+            console.error('[Story Generator] Error checking audio status:', e);
+          }
+          
+          attempts++;
+          if (attempts >= maxAttempts) {
+            console.log('[Story Generator] Audio generation timeout, marking as complete anyway');
+            setStatus("completed"); 
+            setProgress(100);
+            return true;
+          }
+          
+          // Calculate progress percentage (from 80% to 99%)
+          const audioProgress = 80 + Math.min(19, (attempts / maxAttempts) * 19);
+          setProgress(audioProgress);
+          
+          // Try again after delay
+          setTimeout(checkAudio, 5000);
+          return false;
+        };
+        
+        // Start polling
+        checkAudio();
       }
     } catch (err) {
       console.error('[Story Generator] Error in story generation process:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       setStatus("error");
     }
-  };
-
-  // Function to generate audio for the story
-  const generateAudio = async (text: string, voiceId: string): Promise<string> => {
-    console.log('[Story Generator] Starting audio generation with ElevenLabs');
-    console.log(`[Story Generator] Using voice ID: ${voiceId}`);
-    console.log(`[Story Generator] Text length: ${text.length} characters`);
-    
-    try {
-      // Generate audio using ElevenLabs
-      const audioData = await generateStoryAudio(text, voiceId);
-      console.log('[Story Generator] Audio generation successful');
-      return audioData;
-    } catch (err) {
-      console.error('[Story Generator] Error in audio generation:', err);
-      // Instead of handling the error and continuing, we'll propagate it
-      // so the entire story generation process can be marked as failed
-      throw err;
-    }
-  };
-
-  // Function to convert file to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
   };
 
   // Render different content based on status
@@ -209,12 +238,22 @@ export function AsyncStoryGenerator({
           </div>
         );
 
+      case "analyzing":
+        return (
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-indigo-500 mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">Analyzing your images</h3>
+            <p className="text-gray-400 mb-4">Our AI is understanding the scenes in your photos...</p>
+            <Progress value={progress} className="w-full max-w-md" />
+          </div>
+        );
+
       case "generating":
         return (
           <div className="flex flex-col items-center justify-center p-8 text-center">
             <Loader2 className="h-12 w-12 animate-spin text-indigo-500 mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">Creating your story</h3>
-            <p className="text-gray-400 mb-4">This may take a minute or two...</p>
+            <p className="text-gray-400 mb-4">Weaving a magical tale from your photos...</p>
             <Progress value={progress} className="w-full max-w-md" />
           </div>
         );
@@ -346,6 +385,7 @@ export function AsyncStoryGenerator({
           className={cn(
             "h-full transition-all duration-500",
             status === "pending" ? "bg-indigo-600 w-[5%]" :
+            status === "analyzing" ? "bg-purple-600" :
             status === "generating" ? "bg-indigo-600" :
             status === "audio" ? "bg-indigo-600 w-[90%]" :
             status === "completed" ? "bg-green-600 w-full" :
@@ -361,7 +401,39 @@ export function AsyncStoryGenerator({
           <div
             className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center border-2",
-              status === "pending" || status === "generating" || status === "audio" || status === "completed" ? "bg-indigo-900/50 border-indigo-500 text-indigo-300" : "bg-gray-800 border-gray-700 text-gray-500"
+              status === "analyzing" ? "bg-purple-900/50 border-purple-500 text-purple-300" :
+              (status === "pending" || status === "generating" || status === "audio" || status === "completed") ? 
+                "bg-indigo-900/50 border-indigo-500 text-indigo-300" : 
+                "bg-gray-800 border-gray-700 text-gray-500"
+            )}
+          >
+            {status === "analyzing" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+          </div>
+          <span className="text-xs mt-1 text-gray-400">Analyze</span>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center mt-4">
+          <div
+            className={cn(
+              "h-0.5 w-full",
+              (status === "generating" || status === "audio" || status === "completed") ? 
+                "bg-indigo-600" : "bg-gray-800"
+            )}
+          />
+        </div>
+
+        <div className="flex flex-col items-center">
+          <div
+            className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center border-2",
+              status === "generating" ? "bg-indigo-900/50 border-indigo-500 text-indigo-300" :
+              (status === "audio" || status === "completed") ? 
+                "bg-indigo-900/50 border-indigo-500 text-indigo-300" : 
+                "bg-gray-800 border-gray-700 text-gray-500"
             )}
           >
             {status === "generating" ? (
@@ -377,7 +449,7 @@ export function AsyncStoryGenerator({
           <div
             className={cn(
               "h-0.5 w-full",
-              status === "audio" || status === "completed" ? "bg-indigo-600" : "bg-gray-800"
+              (status === "audio" || status === "completed") ? "bg-indigo-600" : "bg-gray-800"
             )}
           />
         </div>

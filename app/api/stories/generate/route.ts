@@ -6,6 +6,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/auth.config';
 import { getAdminClient } from '@/lib/supabase';
 import { rateLimiter } from '@/lib/rate-limiter';
+import { analyzeImagesWithOpenAI, generateStoryWithOpenAI, generateTitleForStory } from '@/lib/openai';
+import { buildEnhancedStoryPrompt } from '@/lib/story-generation';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
     const userId = session.user.id;
     console.log(`[API] Authenticated user: ${userId}`);
     
-    // Rate limiting
+    // Apply rate limiting
     try {
       console.log('[API] Checking rate limit...');
       const { success, limit, reset, remaining } = await rateLimiter.limit(userId);
@@ -168,13 +170,14 @@ export async function POST(req: NextRequest) {
       imageUrls.push('https://placehold.co/600x400?text=Story+Image');
     }
     
-    // Get image analysis if there are images
+    // Analyze images with OpenAI Vision API
     let imageAnalysis = null;
     if (imageUrls.length > 0) {
-      console.log('[API] Analyzing images with DeepSeek');
+      console.log('[API] Analyzing images with OpenAI Vision API');
       try {
-        imageAnalysis = await analyzeImagesWithDeepSeek(imageUrls[0]);
-        console.log('[API] Image analysis complete');
+        // Call the enhanced image analysis
+        imageAnalysis = await analyzeImagesWithOpenAI(imageUrls);
+        console.log('[API] Image analysis complete:', imageAnalysis.length, 'results');
       } catch (analysisError) {
         console.error('[API] Error analyzing images:', analysisError);
         // Continue even if analysis fails - we'll generate without analysis
@@ -182,19 +185,64 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Generate story using DeepSeek
+    // Generate story using OpenAI with enhanced prompt
     console.log('[API] Generating story content');
     let storyData;
     try {
-      storyData = await generateStoryWithDeepSeek({
-        imageUrls,
+      // Create enhanced prompt
+      const prompt = buildEnhancedStoryPrompt({
         imageAnalysis,
         characters,
         theme,
         duration,
         language
       });
-      console.log('[API] Story generation complete');
+      
+      console.log('[API] Enhanced prompt created, length:', prompt.length);
+      
+      // Use OpenAI to generate the story
+      if (process.env.OPENAI_API_KEY || process.env.DEEPSEEK_API_KEY) {
+        console.log('[API] Using AI for story generation');
+        storyData = await generateStoryWithOpenAI(prompt);
+        
+        // If there's a title but it's in English for a non-English story,
+        // or we couldn't extract a title from the content, generate a dedicated title
+        const needsNewTitle = 
+          // No title was generated
+          (storyData.title === "Bedtime Adventure" || !storyData.title) || 
+          // Story language isn't English but title contains only English characters
+          (language.toLowerCase() !== 'english' && /^[a-zA-Z0-9\s.,!?'\-"]+$/.test(storyData.title));
+          
+        if (needsNewTitle) {
+          console.log('[API] Generating dedicated title in correct language:', language);
+          try {
+            // Generate a dedicated title in the correct language
+            const newTitle = await generateTitleForStory(storyData.content, language.toLowerCase());
+            storyData.title = newTitle;
+            console.log('[API] New title generated:', newTitle);
+          } catch (titleError) {
+            console.error('[API] Error generating title:', titleError);
+            // Keep original title if title generation fails
+          }
+        }
+      } else {
+        console.log('[API] AI API key not configured, using fallback generation');
+        // We need a fallback here when AI isn't available
+        storyData = {
+          title: `The ${theme.charAt(0).toUpperCase() + theme.slice(1)} Adventure`,
+          content: `Once upon a time, there was a wonderful ${theme} adventure waiting to happen.
+          
+A child named ${characters?.[0]?.name || 'Alex'} discovered something magical.
+
+It was a day filled with wonder and joy. The sun shined brightly, and birds sang beautiful songs.
+
+After exploring and learning many new things, it was time to go home and rest.
+
+And they all lived happily ever after.`
+        };
+      }
+      
+      console.log('[API] Story generation complete, title:', storyData.title);
     } catch (generationError) {
       console.error('[API] Error generating story:', generationError);
       return new NextResponse(
@@ -231,8 +279,48 @@ export async function POST(req: NextRequest) {
         }
       }
       
+      // Map user language to ElevenLabs language code
+      const languageCodeMap: Record<string, string> = {
+        'english': 'en',
+        'japanese': 'ja',
+        'chinese': 'zh',
+        'german': 'de',
+        'hindi': 'hi',
+        'french': 'fr',
+        'korean': 'ko',
+        'portuguese': 'pt',
+        'italian': 'it',
+        'spanish': 'es',
+        'russian': 'ru',
+        'indonesian': 'id',
+        'dutch': 'nl',
+        'turkish': 'tr',
+        'filipino': 'fil',
+        'polish': 'pl',
+        'swedish': 'sv',
+        'bulgarian': 'bg',
+        'romanian': 'ro',
+        'arabic': 'ar',
+        'czech': 'cs',
+        'greek': 'el',
+        'finnish': 'fi',
+        'croatian': 'hr',
+        'malay': 'ms',
+        'slovak': 'sk',
+        'danish': 'da',
+        'tamil': 'ta',
+        'ukrainian': 'uk',
+        'vietnamese': 'vi',
+        'norwegian': 'no',
+        'hungarian': 'hu'
+      };
+      
+      // Get language code from map or use the language directly if it's already a code
+      const languageCode = languageCodeMap[language.toLowerCase()] || language;
+      console.log(`[API] Using language code: ${languageCode} for language: ${language}`);
+      
       // Call ElevenLabs API
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, {
         method: 'POST',
         headers: {
           'Accept': 'audio/mpeg',
@@ -241,11 +329,12 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           text: textToProcess,
-          model_id: 'eleven_monolingual_v1',
+          model_id: 'eleven_turbo_v2_5',
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75,
-          }
+          },
+          language_code: languageCode
         })
       });
       
@@ -383,7 +472,8 @@ export async function POST(req: NextRequest) {
           story_id: storyId,
           user_id: userId,
           storage_path: url,
-          sequence_index: index + 1
+          sequence_index: index + 1,
+          analysis_result: imageAnalysis && imageAnalysis[index] ? imageAnalysis[index] : null
         }));
         
         const { error: imagesError } = await adminClient
@@ -454,290 +544,4 @@ export async function POST(req: NextRequest) {
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
-}
-
-// Mock image analysis function (for reliability)
-async function analyzeImagesWithDeepSeek(imageUrl: string) {
-  try {
-    console.log('[API] Using mock image analysis (for reliability)');
-    
-    // Extract file name for some basic randomization
-    const fileName = imageUrl.split('/').pop() || '';
-    console.log('[API] Image filename:', fileName);
-    
-    // Settings based on position in filename to add some randomization
-    const settings = [
-      'enchanted forest', 
-      'magical castle', 
-      'sunny meadow', 
-      'starry night sky', 
-      'cozy bedroom',
-      'beautiful garden',
-      'sandy beach',
-      'mountain top',
-      'underwater kingdom',
-      'friendly neighborhood'
-    ];
-    
-    const subjects = [
-      ['child', 'teddy bear'],
-      ['little girl', 'fairy'],
-      ['little boy', 'dragon'],
-      ['family', 'pet dog'],
-      ['twins', 'friendly monster'],
-      ['siblings', 'magical creature'],
-      ['grandparent', 'grandchild'],
-      ['teacher', 'students'],
-      ['animals', 'forest creatures'],
-      ['best friends', 'talking animals']
-    ];
-    
-    const moods = [
-      'peaceful and calming',
-      'exciting and adventurous',
-      'magical and wondrous',
-      'happy and joyful',
-      'curious and inquisitive',
-      'dreamy and sleepy',
-      'friendly and welcoming',
-      'mysterious but safe',
-      'playful and energetic',
-      'gentle and nurturing'
-    ];
-    
-    const storyThemes = [
-      ['friendship', 'helping others', 'kindness'],
-      ['adventure', 'discovery', 'bravery'],
-      ['learning', 'growing', 'understanding'],
-      ['family', 'love', 'togetherness'],
-      ['imagination', 'creativity', 'dreams'],
-      ['nature', 'animals', 'environment'],
-      ['bedtime', 'sleep', 'rest'],
-      ['magic', 'wonder', 'enchantment'],
-      ['seasons', 'weather', 'time'],
-      ['sharing', 'caring', 'compassion']
-    ];
-    
-    const details = [
-      ['colorful flowers', 'a hidden path', 'twinkling stars'],
-      ['a small treasure', 'a magical key', 'glowing fireflies'],
-      ['a rainbow', 'falling leaves', 'a gentle stream'],
-      ['floating clouds', 'singing birds', 'whispering trees'],
-      ['a cozy blanket', 'a secret door', 'a special toy'],
-      ['a friendly animal', 'a magical wand', 'an old book'],
-      ['shadow puppets', 'a music box', 'a talking stuffed animal'],
-      ['a shooting star', 'footprints in the sand', 'a treasure map'],
-      ['a treehouse', 'a swing', 'a picnic blanket'],
-      ['a telescope', 'a magnifying glass', 'a collection of seashells']
-    ];
-    
-    // Use the filename to select elements (this adds variety based on the image)
-    const hash = fileName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const index = hash % 10;
-    
-    // Return a structured analysis object
-    return {
-      subjects: subjects[index],
-      setting: settings[index],
-      themes: storyThemes[index],
-      mood: moods[index],
-      details: details[index],
-      raw: `I can see a scene with ${subjects[index].join(' and ')} in a ${settings[index]}. The mood feels ${moods[index]}. There are interesting details like ${details[index].join(', ')}. This would make a great story about ${storyThemes[index].join(', ')}.`
-    };
-  } catch (error) {
-    console.error('[API] Image analysis error:', error);
-    // Return a fallback analysis that will always work
-    return { 
-      subjects: ['child', 'pet'],
-      setting: 'magical forest',
-      themes: ['adventure', 'friendship', 'bedtime'],
-      mood: 'peaceful and calming',
-      details: ['stars in the sky', 'talking animals', 'hidden path'],
-      raw: 'An image showing a magical scene perfect for a bedtime story.'
-    };
-  }
-}
-
-// Generate a story using a mock API (for reliability)
-async function generateStoryWithDeepSeek({
-  imageUrls,
-  imageAnalysis,
-  characters,
-  theme,
-  duration,
-  language
-}) {
-  try {
-    console.log('[API] Using mock story generation (for reliability)');
-    
-    // Get the duration value in words
-    const durationInWords = typeof duration === 'string' && duration in DURATION_LENGTHS 
-      ? DURATION_LENGTHS[duration as keyof typeof DURATION_LENGTHS] 
-      : 300;
-    
-    // Create a prompt based on the parameters (for debugging/logs only)
-    let prompt = `Generate a children's bedtime story with the following specifications:
-    
-Theme: ${theme}
-Language: ${language}
-Length: ${durationInWords} words (approximately)
-`;
-
-    // Add character information if available
-    let characterNames = [];
-    if (characters && characters.length > 0) {
-      prompt += `\nCharacters:`;
-      characters.forEach(char => {
-        characterNames.push(char.name);
-        prompt += `\n- ${char.name}: ${char.description}`;
-      });
-    }
-
-    // Add image analysis if available
-    let setting = 'magical forest';
-    if (imageAnalysis) {
-      prompt += `\n\nIncorporate the following elements from the user's uploaded images:`;
-      
-      if (imageAnalysis.setting) {
-        setting = imageAnalysis.setting;
-        prompt += `\n- Setting: ${imageAnalysis.setting}`;
-      }
-      
-      if (imageAnalysis.subjects && imageAnalysis.subjects.length > 0) {
-        prompt += `\n- Subjects/Characters: ${imageAnalysis.subjects.join(', ')}`;
-      }
-    }
-
-    console.log('[API] Generated prompt (for debugging):', prompt);
-    
-    // Instead of calling external AI API, generate a mock story
-    // This ensures we always get a valid response in the right format
-    
-    // Generate title based on theme
-    const themeAdjectives = {
-      adventure: ['Epic', 'Daring', 'Bold', 'Grand'],
-      fantasy: ['Magical', 'Enchanted', 'Mystical', 'Wondrous'],
-      educational: ['Amazing', 'Curious', 'Fascinating', 'Wonderful'],
-      bedtime: ['Sleepy', 'Dreamy', 'Peaceful', 'Cozy'],
-    };
-    
-    const adjectives = themeAdjectives[theme] || ['Wonderful', 'Amazing', 'Special', 'Delightful'];
-    const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
-    
-    // Get names from characters, or use defaults
-    const mainCharacterName = characterNames.length > 0 ? 
-      characterNames[0] : 
-      ['Luna', 'Max', 'Zoe', 'Finn', 'Mia'][Math.floor(Math.random() * 5)];
-    
-    const title = `The ${randomAdj} ${theme.charAt(0).toUpperCase() + theme.slice(1)} of ${mainCharacterName}`;
-    
-    // Generate story content with placeholders
-    const storyIntros = {
-      adventure: `Once upon a time, in a faraway ${setting}, there lived a brave young ${mainCharacterName}.`,
-      fantasy: `In a magical ${setting} where anything was possible, ${mainCharacterName} discovered something extraordinary.`,
-      educational: `${mainCharacterName} was always curious about the ${setting} and loved to learn new things.`,
-      bedtime: `As the sun set over the peaceful ${setting}, ${mainCharacterName} was getting ready for bed.`,
-    };
-    
-    const intro = storyIntros[theme] || `Once upon a time in a beautiful ${setting}, ${mainCharacterName} began an unforgettable journey.`;
-    
-    // Create a complete story with proper structure
-    let content = `${intro}\n\n`;
-    
-    // Add some paragraphs based on the requested duration
-    let paraCount = 5; // Default to medium length
-    
-    if (typeof duration === 'string') {
-      if (duration === 'short') paraCount = 3;
-      else if (duration === 'medium') paraCount = 5;
-      else if (duration === 'long') paraCount = 7;
-    } else if (typeof duration === 'number') {
-      // If it's a number, scale paragraphs based on duration in seconds
-      if (duration < 300) paraCount = 3;      // Less than 5 minutes = short
-      else if (duration < 600) paraCount = 5; // Less than 10 minutes = medium
-      else paraCount = 7;                    // Longer than 10 minutes = long
-    }
-    
-    for (let i = 0; i < paraCount; i++) {
-      if (i === 0) {
-        // First paragraph introduces the setting and character
-        content += `The ${setting} was especially beautiful that day. The ${theme === 'bedtime' ? 'stars twinkled' : 'sun shone'} brightly, and ${mainCharacterName} felt a sense of ${theme === 'adventure' ? 'excitement' : theme === 'fantasy' ? 'wonder' : theme === 'educational' ? 'curiosity' : 'peace'}.\n\n`;
-      } else if (i === paraCount - 1) {
-        // Last paragraph wraps up the story
-        content += `And so, after an incredible day filled with ${theme}, ${mainCharacterName} went home feeling happy and content. ${theme === 'bedtime' ? 'It was time to sleep, and dream of tomorrow\'s adventures.' : 'There would be more adventures tomorrow, but for now, it was time to rest.'}\n\n`;
-      } else {
-        // Middle paragraphs advance the story based on theme
-        if (theme === 'adventure') {
-          content += `${mainCharacterName} ventured deeper into the ${setting}, discovering hidden treasures and making new friends along the way. Each step brought new challenges to overcome.\n\n`;
-        } else if (theme === 'fantasy') {
-          content += `With a wave of magic, the ${setting} transformed before ${mainCharacterName}'s eyes. Colorful creatures appeared, speaking in friendly voices and offering their help.\n\n`;
-        } else if (theme === 'educational') {
-          content += `${mainCharacterName} learned about the different plants and animals that lived in the ${setting}. Each discovery brought new understanding about how the world works.\n\n`;
-        } else {
-          content += `The gentle sounds of the ${setting} made ${mainCharacterName} feel sleepy and peaceful. The day's adventures had been wonderful, but now it was time to rest.\n\n`;
-        }
-      }
-    }
-    
-    // Add a moral or conclusion
-    content += `The End.\n\n`;
-    
-    // Add a small moral based on theme
-    if (theme === 'adventure') {
-      content += 'Remember, every day brings new adventures if you are brave enough to seek them.';
-    } else if (theme === 'fantasy') {
-      content += 'Magic exists everywhere, if you know where to look.';
-    } else if (theme === 'educational') {
-      content += 'Learning new things makes every day special.';
-    } else {
-      content += 'Sweet dreams and peaceful sleep make every day better.';
-    }
-    
-    // Add language adaptation if needed
-    if (language !== 'english') {
-      content += `\n\n[This story would be translated to ${language}.]`;
-    }
-    
-    // Return well-formed result
-    return { 
-      title: title,
-      content: content
-    };
-  } catch (error) {
-    console.error('[API] Story Generation error:', error);
-    // Return a fallback story that will always work
-    return { 
-      title: `The ${theme} Adventure`,
-      content: `Once upon a time, in a world of ${theme}, there was an adventure waiting to happen. 
-      
-      A child named ${characters?.[0]?.name || 'Alex'} discovered something magical in the ${imageAnalysis?.setting || 'forest'}. 
-      
-      It was a day filled with wonder and joy. The sun shined brightly, and birds sang beautiful songs.
-      
-      After exploring and learning many new things, it was time to go home and rest.
-      
-      And they all lived happily ever after.`
-    };
-  }
-}
-
-// Find this section where the error is being thrown
-try {
-  // ElevenLabs API call code
-} catch (error) {
-  console.error('[API] Error generating audio with ElevenLabs:', error);
-  
-  // Fix the error handling here
-  let errorMessage = 'ElevenLabs API error';
-  if (error instanceof Error) {
-    errorMessage = `ElevenLabs API error: ${error.message}`;
-  } else if (typeof error === 'object' && error !== null) {
-    try {
-      errorMessage = `ElevenLabs API error: ${JSON.stringify(error)}`;
-    } catch (e) {
-      errorMessage = 'ElevenLabs API error: Unknown error format';
-    }
-  }
-  
-  throw new Error(errorMessage);
 }
