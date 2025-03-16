@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 import {
   Play,
   Pause,
@@ -26,7 +27,8 @@ import {
   Users,
   Heart,
   MoreHorizontal,
-  ArrowLeft
+  ArrowLeft,
+  Check
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -35,7 +37,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatDuration } from "@/lib/format-duration";
-import { toggleStoryFavorite } from "@/lib/services/story-service";
+import { toggleFavoriteAction } from "@/app/actions/story-actions";
 import { recordPlayStart, updatePlayProgress } from "@/lib/services/history-service";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -214,15 +216,23 @@ export function StoryDetail({
   
   const handleToggleFavorite = async () => {
     const newFavoriteState = !isFavorite;
+    // Optimistic update UI
     setIsFavorite(newFavoriteState);
     
-    // Update in Supabase
     try {
-      const updated = await toggleStoryFavorite(storyId, newFavoriteState);
-      if (!updated) {
-        // Revert if failed
+      console.log(`[StoryDetail] Toggling favorite for story ${storyId}, current state: ${isFavorite}`);
+      
+      // Use the server action directly to avoid CORS issues
+      const response = await toggleFavoriteAction(storyId, newFavoriteState);
+      console.log(`[StoryDetail] Server action response:`, response);
+      
+      if (!response.success) {
+        // Revert state if operation was not successful
         setIsFavorite(isFavorite);
         toast.error("Failed to update favorite status.");
+      } else {
+        // Show success toast
+        toast.success(newFavoriteState ? "Added to favorites" : "Removed from favorites");
       }
     } catch (error) {
       console.error("Error toggling favorite:", error);
@@ -364,119 +374,262 @@ export function StoryDetail({
           </Card>
         </div>
         
-        {/* Story text */}
+        {/* Story text - Book-like UI */}
         <div className="md:col-span-2">
-          <Card className="bg-gray-900 border-gray-800 h-full">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BookOpen className="mr-2 h-5 w-5 text-indigo-400" />
-                Story
+          <Card className="bg-gradient-to-b from-gray-900 to-gray-950 border-gray-800 h-full relative overflow-hidden shadow-xl">
+            {/* Decorative Book Elements */}
+            <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-indigo-900/40 border-b border-indigo-800/50"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-indigo-900/40 to-transparent"></div>
+            
+            <CardHeader className="relative z-10">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/5 rounded-full blur-3xl -z-10"></div>
+              <CardTitle className="flex items-center text-2xl font-serif">
+                <BookOpen className="mr-3 h-5 w-5 text-indigo-400" />
+                <span className="text-indigo-100 drop-shadow-sm">Story</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="prose prose-invert max-w-none">
+            
+            <CardContent className="relative z-10 p-8">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="prose prose-invert max-w-none font-serif"
+              >
                 {storyData.content.split('\n\n').map((paragraph, index) => (
-                  <p key={index} className="mb-4 text-gray-300 leading-relaxed">
+                  <motion.p 
+                    key={index} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.1 * (index + 1) }}
+                    className="mb-6 text-gray-200 leading-relaxed text-lg first-letter:text-3xl first-letter:font-bold first-letter:text-indigo-300 first-letter:mr-1 first-letter:float-left"
+                  >
                     {paragraph.trim()}
-                  </p>
+                  </motion.p>
                 ))}
-              </div>
+              </motion.div>
+              
+              {/* Decorative elements */}
+              <div className="absolute bottom-4 right-4 text-gray-700 font-serif italic text-sm">~ The End ~</div>
+              <div className="absolute bottom-0 right-0 w-40 h-40 bg-blue-600/5 rounded-full blur-3xl -z-10"></div>
             </CardContent>
           </Card>
         </div>
       </div>
       
-      {/* Audio player */}
-      <Card className="bg-gray-900 border-gray-800 mb-6">
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            {/* Progress bar */}
-            <div 
-              className="w-full h-2 bg-gray-800 rounded-full cursor-pointer"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const clickPosition = e.clientX - rect.left;
-                const clickPercent = (clickPosition / rect.width) * 100;
-                handleSeek(clickPercent);
-              }}
-            >
-              <div 
-                className="h-full bg-indigo-500 rounded-full"
-                style={{ width: `${progress}%` }}
-              ></div>
+      {/* Enhanced Audio player with animations */}
+      <Card className="bg-gradient-to-b from-indigo-950/60 to-gray-900 border-indigo-900/30 shadow-xl mb-8 relative overflow-hidden">
+        {/* Background animation effects */}
+        <div className="absolute inset-0 bg-[url('/backgrounds/sparkles.svg')] opacity-5 bg-repeat"></div>
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl"></div>
+        
+        <CardContent className="p-6 relative z-10">
+          <div>
+            {/* Visual audio wave effect */}
+            <div className="flex justify-center items-end h-16 mb-4 gap-[2px] mx-auto max-w-lg">
+              {Array.from({ length: 40 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="w-1 bg-indigo-500/60"
+                  initial={{ height: 4 }}
+                  animate={{ 
+                    height: isPlaying 
+                      ? Math.max(6, Math.min(40, 
+                          8 + 10 * Math.sin((i * 0.5) + Date.now() / (300 + i * 20))
+                        )) 
+                      : 4 
+                  }}
+                  transition={{ 
+                    duration: 0.1,
+                    repeat: Infinity,
+                    repeatType: "mirror"
+                  }}
+                />
+              ))}
             </div>
             
-            {/* Time display and controls */}
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-400">
-                {formatDuration(currentTime)} / {formatDuration(storyData.duration)}
+            {/* Interactive Progress bar */}
+            <div className="relative w-full h-3 mb-3">
+              <div 
+                className="absolute inset-0 bg-gray-800/80 rounded-full cursor-pointer overflow-hidden backdrop-blur-sm"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const clickPosition = e.clientX - rect.left;
+                  const clickPercent = (clickPosition / rect.width) * 100;
+                  handleSeek(clickPercent);
+                }}
+              >
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full"
+                  style={{ width: `${progress}%` }}
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ type: "spring", bounce: 0 }}
+                />
+                
+                {/* Current position indicator */}
+                <motion.div 
+                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white shadow-md cursor-grab active:cursor-grabbing"
+                  style={{ left: `calc(${progress}% - 8px)` }}
+                  initial={{ left: "0%" }}
+                  animate={{ left: `calc(${progress}% - 8px)` }}
+                  transition={{ type: "spring", bounce: 0 }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0}
+                  dragMomentum={false}
+                  onDrag={(e, info) => {
+                    const parentWidth = (e.target as HTMLElement).parentElement?.offsetWidth || 0;
+                    const newPercent = Math.max(0, Math.min(100, (info.point.x / parentWidth) * 100));
+                    handleSeek(newPercent);
+                  }}
+                />
+              </div>
+            </div>
+            
+            {/* Time display */}
+            <div className="flex justify-between text-xs text-gray-400 mb-6">
+              <div>{formatDuration(currentTime)}</div>
+              <div>{formatDuration(storyData.duration)}</div>
+            </div>
+            
+            {/* Player controls - Center aligned for mobile */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 order-2 sm:order-1">
+                <Volume2 className="h-5 w-5 text-indigo-300" />
+                <div className="w-24 h-2 bg-gray-800/80 rounded-full overflow-hidden">
+                  <div className="w-3/4 h-full bg-indigo-600/70 rounded-full"></div>
+                </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="border-gray-700 h-10 w-10"
+              <div className="flex items-center justify-center gap-3 order-1 sm:order-2">
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-gray-800/60 backdrop-blur-sm h-12 w-12 rounded-full flex items-center justify-center text-indigo-300 border border-indigo-900/50"
                   onClick={handleSkipBack}
                 >
                   <SkipBack className="h-5 w-5" />
-                </Button>
+                </motion.button>
                 
-                <Button 
-                  className="bg-indigo-600 hover:bg-indigo-700 h-12 w-12 rounded-full"
-                  size="icon"
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.05 }}
+                  className={`${isPlaying 
+                    ? 'bg-gradient-to-br from-purple-600 to-indigo-700' 
+                    : 'bg-gradient-to-br from-indigo-500 to-purple-600'
+                  } h-16 w-16 rounded-full flex items-center justify-center text-white shadow-lg shadow-indigo-900/20`}
                   onClick={togglePlayPause}
                 >
                   {isPlaying ? (
-                    <Pause className="h-5 w-5" />
+                    <Pause className="h-7 w-7" />
                   ) : (
-                    <Play className="h-5 w-5 ml-1" />
+                    <Play className="h-7 w-7 ml-1" />
                   )}
-                </Button>
+                  
+                  {/* Pulse animation when playing */}
+                  {isPlaying && (
+                    <motion.div
+                      className="absolute inset-0 rounded-full bg-indigo-500"
+                      animate={{
+                        opacity: [1, 0],
+                        scale: [1, 1.4]
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        ease: "easeOut"
+                      }}
+                      style={{ zIndex: -1 }}
+                    />
+                  )}
+                </motion.button>
                 
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="border-gray-700 h-10 w-10"
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-gray-800/60 backdrop-blur-sm h-12 w-12 rounded-full flex items-center justify-center text-indigo-300 border border-indigo-900/50"
                   onClick={handleSkipForward}
                 >
                   <SkipForward className="h-5 w-5" />
-                </Button>
+                </motion.button>
               </div>
               
-              <div className="flex items-center gap-2">
-                <Volume2 className="h-5 w-5 text-gray-400" />
-                <div className="w-24 h-2 bg-gray-800 rounded-full">
-                  <div className="w-3/4 h-full bg-gray-600 rounded-full"></div>
-                </div>
+              <div className="order-3 sm:order-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex items-center gap-1.5 py-2 px-3 rounded-full text-sm ${
+                    isFavorite 
+                      ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
+                      : 'bg-gray-800/40 text-gray-300 border border-gray-700'
+                  }`}
+                  onClick={handleToggleFavorite}
+                >
+                  <Heart className="h-4 w-4" fill={isFavorite ? "#ef4444" : "none"} />
+                  <span className="hidden sm:inline">
+                    {isFavorite ? "Favorited" : "Add to Favorites"}
+                  </span>
+                </motion.button>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
       
-      {/* Character information */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Users className="mr-2 h-5 w-5 text-indigo-400" />
-            Characters
+      {/* Character information - Enhanced with animations */}
+      <Card className="bg-gradient-to-b from-gray-900 to-gray-950 border-gray-800 shadow-lg relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-40 h-40 bg-purple-600/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-600/5 rounded-full blur-3xl"></div>
+        
+        <CardHeader className="relative z-10">
+          <CardTitle className="flex items-center text-2xl">
+            <Users className="mr-3 h-6 w-6 text-indigo-400" />
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-purple-300">
+              Characters
+            </span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <CardContent className="relative z-10">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
             {storyData.characters.map((character, index) => (
-              <div 
+              <motion.div
                 key={index}
-                className="bg-gray-800/50 border border-gray-700 rounded-lg p-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 * index }}
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 backdrop-blur-sm border border-indigo-900/30 rounded-xl p-5 shadow-md relative overflow-hidden"
               >
-                <h3 className="text-white font-medium mb-1">{character.name}</h3>
-                {character.description && (
-                  <p className="text-sm text-gray-400">{character.description}</p>
-                )}
-              </div>
+                {/* Character sparkle effect in corner */}
+                <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl -z-10"></div>
+                
+                <div className="flex items-start gap-3">
+                  {/* Character icon/avatar */}
+                  <div className="bg-indigo-900/40 text-indigo-300 rounded-full h-10 w-10 flex items-center justify-center flex-shrink-0 border border-indigo-700/40">
+                    {character.name.charAt(0).toUpperCase()}
+                  </div>
+                  
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-white mb-1.5">{character.name}</h3>
+                    {character.description ? (
+                      <p className="text-sm text-gray-300 italic leading-relaxed">
+                        "{character.description}"
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-400">Main character in the story</p>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </CardContent>
       </Card>
     </div>

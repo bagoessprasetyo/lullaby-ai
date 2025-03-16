@@ -25,7 +25,6 @@ import {
 import { motion } from "framer-motion";
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { useUpgradeModal } from "@/hooks/useUpgradeModal";
-import { ImageAnalyzer } from "./image-analyzer";
 
 interface UploadAndThemeStepProps {
   formData: StoryFormData;
@@ -162,12 +161,6 @@ export function UploadAndThemeStep({
     // Combine with existing images, but limit to 5 total
     const combinedFiles = [...formData.images, ...validFiles].slice(0, maxFiles);
     updateFormData('images', combinedFiles);
-    
-    // Automatically suggest a theme based on the images
-    // This is a placeholder - in a real app, you'd use AI to analyze images
-    if (!formData.theme && validFiles.length > 0) {
-      updateFormData('theme', 'adventure');
-    }
   };
   
   const removeImage = (index: number) => {
@@ -176,8 +169,6 @@ export function UploadAndThemeStep({
     updateFormData('images', updatedImages);
   };
 
-  // Suggest a theme based on images (placeholder logic)
-  const suggestedTheme = formData.images.length > 0 ? "adventure" : null;
 
   return (
     <div className="space-y-6">
@@ -291,25 +282,6 @@ export function UploadAndThemeStep({
         </Alert>
       )}
       
-      {/* Theme Suggestion - only show if we have images */}
-      {suggestedTheme && !formData.theme && (
-        <Alert className="bg-indigo-900/20 border-indigo-800">
-          <Sparkles className="h-4 w-4 text-indigo-400" />
-          <AlertDescription className="text-indigo-300">
-            Based on your photos, we suggest an <strong>Adventure</strong> theme!
-          </AlertDescription>
-        </Alert>
-      )}
-      {formData.images.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-gray-800">
-            <ImageAnalyzer
-              images={formData.images}
-              formData={formData}
-              updateFormData={updateFormData}
-              isSubscriber={isSubscriber}
-            />
-          </div>
-      )}
       {/* Theme Selection */}
       <div className="mt-8">
         <div className="flex items-start justify-between mb-4">

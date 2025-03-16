@@ -60,8 +60,8 @@ export const authOptions: NextAuthOptions = {
     // signOut: '/auth/signout'
   },
 
-  // Enable debug logs in development
-  debug: true,
+  // Enable debug logs only in development
+  debug: process.env.NODE_ENV === "development",
 
   // Callbacks for customizing authentication behavior
   callbacks: {
@@ -95,12 +95,10 @@ export const authOptions: NextAuthOptions = {
         // Only sync if we have an ID and Supabase URL is configured
         if (oauthId && process.env.NEXT_PUBLIC_SUPABASE_URL) {
           try {
-            console.log(`[SUPABASE] Attempting to find user with OAuth ID: ${oauthId}`);
             // First, try to find by OAuth ID
             let profile = await findUserByOAuthId(oauthId);
             
             if (profile) {
-              console.log(`[SUPABASE] Found existing user profile: ${profile.id}`);
               profile = await syncUserWithSupabase({
                 id: oauthId,
                 name: token.name as string || '',
@@ -108,7 +106,6 @@ export const authOptions: NextAuthOptions = {
                 image: token.image as string || ''
               });
             } else {
-              console.log(`[SUPABASE] Profile not found, attempting to sync`);
               // If not found, sync the user with both auth and profiles tables
               profile = await syncUserWithSupabase({
                 id: oauthId,
@@ -116,12 +113,6 @@ export const authOptions: NextAuthOptions = {
                 email: token.email as string || '',
                 image: token.image as string || ''
               });
-              
-              if (profile) {
-                console.log(`[SUPABASE] User profile created with ID: ${profile.id}`);
-              } else {
-                console.error(`[SUPABASE] Failed to create user profile`);
-              }
             }
             
             if (profile) {
@@ -134,7 +125,6 @@ export const authOptions: NextAuthOptions = {
                 storyCredits: profile.story_credits,
                 voiceCredits: profile.voice_credits
               };
-              console.log(`[SUPABASE] Session updated with profile data`);
             }
           } catch (error) {
             console.error("[SUPABASE] Error syncing with Supabase:", error);

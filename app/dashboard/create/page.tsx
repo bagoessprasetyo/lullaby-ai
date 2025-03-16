@@ -14,7 +14,8 @@ import {
   Sparkles, 
   ArrowRight, 
   ArrowLeft,
-  AlertCircle
+  AlertCircle,
+  Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UploadAndThemeStep } from "@/components/story-creation/upload-and-theme-step";
@@ -25,6 +26,7 @@ import { ReviewStep } from "@/components/story-creation/review-step";
 import { EnhancedStoryGenerator } from "@/components/story-creation/async-generator";
 import { useSubscription } from "@/hooks/useSubscription";
 import { QuickStartTemplates } from "@/components/story-creation/quick-start-templates";
+import { motion } from "framer-motion";
 
 // Types for our form data
 export type StoryFormData = {
@@ -84,6 +86,7 @@ export default function StoryCreationPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<StoryFormData>(initialFormData);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [generationTrigger, setGenerationTrigger] = useState(0);
   
   // Use our subscription hook that uses server action
   const { features, isSubscriber, isLoading: subscriptionLoading } = useSubscription();
@@ -168,6 +171,10 @@ export default function StoryCreationPage() {
     if (validateStep()) {
       // Set generating state
       updateFormData("isGenerating", true);
+      // Trigger generation after a short delay to ensure component has mounted
+      setTimeout(() => {
+        setGenerationTrigger(prev => prev + 1);
+      }, 200);
     }
   };
   
@@ -213,47 +220,87 @@ export default function StoryCreationPage() {
         
         {!formData.isGenerating && (
           <>
-            {/* Progress Indicators */}
+            {/* Progress Indicators - Enhanced for Mobile */}
             <div className="mb-8">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm text-gray-400 flex items-center gap-2">
-                  <span className="font-medium text-white">{steps[currentStep].label}</span>
-                  <span>• {Math.round(progressPercentage)}% complete</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+                <div className="flex items-center">
+                  <motion.div 
+                    key={currentStep}
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="flex items-center gap-2"
+                  >
+                    <div className="bg-indigo-900/40 p-1.5 rounded-full text-indigo-300">
+                      {steps[currentStep].icon}
+                    </div>
+                    <span className="font-medium text-white text-base">{steps[currentStep].label}</span>
+                  </motion.div>
+                  <span className="text-xs text-gray-400 ml-3">Step {currentStep + 1} of {steps.length}</span>
                 </div>
+                
                 {!isSubscriber && (
-                  <div className="flex items-center gap-1 text-xs text-amber-400">
-                    <AlertCircle className="h-3 w-3" />
-                    <span>Some features require subscription</span>
+                  <div className="flex items-center gap-1 text-xs text-amber-400 mt-1 sm:mt-0 px-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>Premium features available with subscription</span>
                   </div>
                 )}
               </div>
               
               {/* Progress bar */}
-              <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-indigo-600 rounded-full transition-all duration-300"
-                  style={{ width: `${progressPercentage}%` }}
+              <div className="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full"
+                  initial={{ width: `${((currentStep) / steps.length) * 100}%` }}
+                  animate={{ width: `${progressPercentage}%` }}
+                  transition={{ duration: 0.5, ease: "easeInOut" }}
                 />
               </div>
               
-              {/* Step circles */}
-              <div className="relative flex justify-between mt-2">
+              {/* Interactive Step circles */}
+              <div className="relative flex justify-between mt-4 items-center">
+                {/* Connecting line */}
+                <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800 -z-10"></div>
+                
                 {steps.map((step, index) => (
                   <div key={step.id} className="flex flex-col items-center">
-                    <div 
+                    <motion.div 
+                      whileHover={index <= currentStep ? { scale: 1.1 } : {}}
                       className={cn(
-                        "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all",
+                        "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all cursor-pointer",
                         currentStep === index 
-                          ? "border-indigo-500 bg-indigo-900/50 text-indigo-300" 
+                          ? "border-indigo-500 bg-indigo-900/60 text-indigo-300 shadow-md shadow-indigo-800/20" 
                           : index < currentStep 
-                          ? "border-gray-500 bg-gray-700 text-gray-200" 
+                          ? "border-indigo-400 bg-indigo-800/50 text-indigo-300" 
                           : "border-gray-700 bg-gray-800 text-gray-500"
                       )}
+                      onClick={() => {
+                        // Only allow moving to steps that are completed or current
+                        if (index <= currentStep) {
+                          setCurrentStep(index);
+                        }
+                      }}
                     >
-                      {step.icon}
-                    </div>
-                    <span className="text-xs mt-1 text-gray-400 hidden md:block">
+                      {index < currentStep ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        step.icon
+                      )}
+                    </motion.div>
+                    
+                    <span className={cn(
+                      "text-xs mt-2 transition-colors",
+                      currentStep === index
+                        ? "text-indigo-300 font-medium"
+                        : index < currentStep
+                        ? "text-gray-300"
+                        : "text-gray-500"
+                    )}>
                       {step.label}
+                    </span>
+                    
+                    {/* Step description - only visible on desktop */}
+                    <span className="text-xs text-gray-500 mt-1 hidden md:block max-w-[100px] text-center">
+                      {step.description}
                     </span>
                   </div>
                 ))}
@@ -268,6 +315,8 @@ export default function StoryCreationPage() {
               <EnhancedStoryGenerator 
                 formData={formData}
                 onReset={handleResetGeneration}
+                autoGenerate={false}
+                triggerGeneration={generationTrigger}
               />
             ) : (
               <>
@@ -310,46 +359,53 @@ export default function StoryCreationPage() {
                   )}
                 </div>
                 
-                {/* Navigation Buttons */}
-                <div className="flex items-center justify-between mt-8">
-                  <Button
-                    variant="outline"
-                    onClick={handlePrevious}
-                    disabled={currentStep === 0 || formData.isGenerating}
-                    className="border-gray-700"
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Previous
-                  </Button>
+                {/* Navigation Buttons - Enhanced for Mobile */}
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/90 backdrop-blur-sm border-t border-gray-800 flex items-center justify-between md:static md:bg-transparent md:backdrop-blur-none md:border-0 md:mt-8 md:p-0 z-10">
+                  <div className="w-1/2 pr-2">
+                    <Button
+                      variant="outline"
+                      onClick={handlePrevious}
+                      disabled={currentStep === 0 || formData.isGenerating}
+                      className="border-gray-700 w-full h-12 md:h-auto md:w-auto flex items-center justify-center"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      <span className="block">Previous</span>
+                    </Button>
+                  </div>
                   
-                  {currentStep < steps.length - 1 ? (
-                    <Button 
-                      onClick={handleNext}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      Next
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  ) : (
-                    <Button 
-                      onClick={handleGenerateStory}
-                      disabled={formData.isGenerating}
-                      className="text-white bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      {formData.isGenerating ? (
-                        <>
-                          <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Generating Story...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="text-white mr-2 h-4 w-4" />
-                          Generate Story
-                        </>
-                      )}
-                    </Button>
-                  )}
+                  <div className="w-1/2 pl-2">
+                    {currentStep < steps.length - 1 ? (
+                      <Button 
+                        onClick={handleNext}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white w-full h-12 md:h-auto md:w-auto flex items-center justify-center"
+                      >
+                        <span className="block">Next</span>
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={handleGenerateStory}
+                        disabled={formData.isGenerating}
+                        className="text-white bg-indigo-600 hover:bg-indigo-700 w-full h-12 md:h-auto md:w-auto flex items-center justify-center"
+                      >
+                        {formData.isGenerating ? (
+                          <>
+                            <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                            <span className="block">Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="text-white mr-2 h-4 w-4" />
+                            <span className="block">Generate</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Add spacing at the bottom to prevent content from being hidden behind the fixed navigation on mobile */}
+                <div className="h-20 md:hidden"></div>
               </>
             )}
           </Card>

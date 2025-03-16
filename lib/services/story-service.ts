@@ -212,22 +212,35 @@ export async function getStoriesWithFilters(
   };
 }
 
-// Toggle favorite status
+// Toggle favorite status - CLIENT SIDE VERSION (called from components)
 export async function toggleStoryFavorite(storyId: string, isFavorite: boolean) {
-  const client = typeof window === 'undefined' ? getAdminClient() : supabase;
-  const { data, error } = await client
-    .from('stories')
-    .update({ is_favorite: isFavorite })
-    .eq('id', storyId)
-    .select()
-    .single();
+  // Log detailed information for debugging
+  console.log(`[CLIENT] Calling server action to toggle favorite for story ${storyId} to ${isFavorite}`);
   
-  if (error) {
-    console.error("Error updating favorite status:", error);
-    return null;
+  try {
+    // Because we can't directly use supabase from client components due to CORS,
+    // we'll call the server action directly (which must exist in app/actions)
+    const result = await fetch('/api/stories/favorite', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ storyId, isFavorite }),
+    });
+    
+    if (!result.ok) {
+      const error = await result.json();
+      console.error("[CLIENT] Error toggling favorite via API:", error);
+      throw new Error(error.message || "Failed to update favorite status");
+    }
+    
+    const data = await result.json();
+    console.log("[CLIENT] Successfully toggled favorite via API:", data);
+    return data;
+  } catch (e) {
+    console.error("[CLIENT] Exception in toggleStoryFavorite:", e);
+    throw e; // Re-throw to let the error handler in the component deal with it
   }
-  
-  return data;
 }
 
 // Delete a story
@@ -294,6 +307,8 @@ export async function getRecentStories(userId: string, limit = 3) {
       *,
       images(id, storage_path, sequence_index)
     `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
     .order('sequence_index', { foreignTable: 'images' })
     .limit(limit);
     
@@ -451,19 +466,57 @@ export async function getStoryById(storyId: string) {
 }
 
 export async function getFavoriteStories(userId: string, limit = 3) {
-  const client = typeof window === 'undefined' ? getAdminClient() : supabase;
-  const { data, error } = await client
-    .from('stories')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_favorite', true)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-    
-  if (error) {
-    console.error("Error fetching favorite stories:", error);
+  if (!userId) {
+    console.error("Missing user ID in getFavoriteStories");
     return [];
   }
+
+  console.log(`[SERVICE] Getting favorite stories for user: ${userId}, limit: ${limit}`);
   
-  return data || [];
+  try {
+    // Get client based on environment
+    let client;
+    try {
+      client = getAdminClient();
+      console.log("[SERVICE] Using admin client for getFavoriteStories");
+    } catch (error) {
+      console.warn("[SERVICE] Admin client not available, falling back to browser client");
+      client = supabase;
+    }
+    
+    // Query favorite stories with images
+    const { data, error } = await client
+      .from('stories')
+      .select(`
+        *,
+        images(id, storage_path, sequence_index)
+      `)
+      .eq('user_id', userId)
+      .eq('is_favorite', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error(`[SERVICE] Error fetching favorite stories: ${error.message}`, error);
+      return [];
+    }
+    
+    console.log(`[SERVICE] Successfully fetched ${data?.length || 0} favorite stories`);
+    
+    // Sort images by sequence_index if available 
+    if (data) {
+      data.forEach(story => {
+        if (story.images && Array.isArray(story.images)) {
+          story.images.sort((a: any, b: any) => 
+            (a.sequence_index || 0) - (b.sequence_index || 0)
+          );
+        }
+      });
+    }
+    
+    return data || [];
+  } catch (e) {
+    console.error(`[SERVICE] Exception in getFavoriteStories: ${e}`);
+    return [];
+  }
 }

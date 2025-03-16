@@ -9,13 +9,15 @@ import { Separator } from "@/components/ui/separator";
 import { StoryAudioPlayer } from "./story-audio-player";
 import {
   CheckCircle2,
-  FileText,
   Loader2,
   RefreshCw,
   RotateCcw,
   Volume2,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  Sparkles,
+  FileText
 } from "lucide-react";
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { cn } from "@/lib/utils";
@@ -24,11 +26,15 @@ import { cn } from "@/lib/utils";
 interface EnhancedStoryGeneratorProps {
   formData: StoryFormData;
   onReset: () => void;
+  autoGenerate?: boolean; // Add optional prop to control automatic generation
+  triggerGeneration?: number; // A number that changes to trigger story generation
 }
 
 export function EnhancedStoryGenerator({
   formData,
-  onReset
+  onReset,
+  autoGenerate = true, // Default to true for backward compatibility
+  triggerGeneration = 0 // Default to 0
 }: EnhancedStoryGeneratorProps) {
   const [status, setStatus] = useState<"pending" | "analyzing" | "generating" | "audio" | "completed" | "error">("pending");
   const [progress, setProgress] = useState(0);
@@ -42,11 +48,21 @@ export function EnhancedStoryGenerator({
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
-  // Start generating the story when component mounts
+  // Generate story when component mounts, but only if autoGenerate is true
   useEffect(() => {
-    console.log('[Story Generator] Component mounted, starting story generation');
-    generateStory();
-  }, []);
+    console.log('[Story Generator] Component mounted, autoGenerate:', autoGenerate);
+    if (autoGenerate) {
+      generateStory();
+    }
+  }, [autoGenerate]);
+  
+  // Trigger story generation when triggerGeneration changes
+  useEffect(() => {
+    if (triggerGeneration > 0) {
+      console.log('[Story Generator] Triggered generation externally:', triggerGeneration);
+      generateStory();
+    }
+  }, [triggerGeneration]);
 
   // Function to convert File to base64
   const fileToBase64 = async (file: File): Promise<string> => {
@@ -58,7 +74,7 @@ export function EnhancedStoryGenerator({
     });
   };
 
-  // Function to generate the story with our enhanced process
+  // Function to generate the story with our enhanced process - exported so it can be called manually
   const generateStory = async () => {
     console.log('[Story Generator] Starting enhanced story generation process');
     try {
@@ -68,28 +84,19 @@ export function EnhancedStoryGenerator({
       setError(null);
       setErrorDetails(null);
 
-      // Convert images to base64
+      // Set correct status for uploading images
+      setStatus("analyzing");
+      console.log('[Story Generator] Preparing to upload images to Cloudinary');
+      
+      // Convert images to base64 for API upload
       console.log(`[Story Generator] Converting ${formData.images.length} images to base64`);
       const imagePromises = formData.images.map(file => fileToBase64(file));
       const images = await Promise.all(imagePromises);
 
-      setProgress(20);
-      console.log('[Story Generator] Images converted successfully');
-
-      // Do image analysis first (optional separate step)
-      setStatus("analyzing");
-      console.log('[Story Generator] Analyzing images');
+      setProgress(25);
+      console.log('[Story Generator] Images converted successfully, ready for upload');
       
-      try {
-        // We could call a separate analysis endpoint here if needed
-        // For now, we'll let the generate API handle the analysis
-        // This is a placeholder for the analysis step visualization
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setProgress(30);
-      } catch (analysisError) {
-        console.error('[Story Generator] Image analysis error:', analysisError);
-        // Continue without specific analysis data
-      }
+      // Image upload will happen in the API call
 
       // Prepare request payload
       const payload = {
@@ -242,8 +249,8 @@ export function EnhancedStoryGenerator({
         return (
           <div className="flex flex-col items-center justify-center p-8 text-center">
             <Loader2 className="h-12 w-12 animate-spin text-indigo-500 mb-4" />
-            <h3 className="text-lg font-medium text-white mb-2">Analyzing your images</h3>
-            <p className="text-gray-400 mb-4">Our AI is understanding the scenes in your photos...</p>
+            <h3 className="text-lg font-medium text-white mb-2">Uploading your images</h3>
+            <p className="text-gray-400 mb-4">Processing and uploading your photos to create your story...</p>
             <Progress value={progress} className="w-full max-w-md" />
           </div>
         );
@@ -395,13 +402,13 @@ export function EnhancedStoryGenerator({
         />
       </div>
 
-      {/* Status Steps */}
+      {/* Status Steps - Simplified Flow */}
       <div className="flex justify-between px-6 pt-6 pb-2">
         <div className="flex flex-col items-center">
           <div
             className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center border-2",
-              status === "analyzing" ? "bg-purple-900/50 border-purple-500 text-purple-300" :
+              status === "analyzing" ? "bg-indigo-900/50 border-indigo-500 text-indigo-300" :
               (status === "pending" || status === "generating" || status === "audio" || status === "completed") ? 
                 "bg-indigo-900/50 border-indigo-500 text-indigo-300" : 
                 "bg-gray-800 border-gray-700 text-gray-500"
@@ -410,10 +417,10 @@ export function EnhancedStoryGenerator({
             {status === "analyzing" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <FileText className="h-4 w-4" />
+              <Upload className="h-4 w-4" />
             )}
           </div>
-          <span className="text-xs mt-1 text-gray-400">Analyze</span>
+          <span className="text-xs mt-1 text-gray-400">Upload</span>
         </div>
 
         <div className="flex-1 flex items-center justify-center mt-4">
@@ -439,10 +446,10 @@ export function EnhancedStoryGenerator({
             {status === "generating" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <FileText className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" />
             )}
           </div>
-          <span className="text-xs mt-1 text-gray-400">Generate</span>
+          <span className="text-xs mt-1 text-gray-400">Create</span>
         </div>
 
         <div className="flex-1 flex items-center justify-center mt-4">

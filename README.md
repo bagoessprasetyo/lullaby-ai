@@ -2,6 +2,10 @@
 
 Lullaby.ai is an application that generates personalized bedtime stories using AI technology. Upload family photos, customize story settings, and generate engaging narrated stories for your children.
 
+## Deployment
+
+This application is set up for deployment on Vercel. For detailed deployment instructions, please see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## AI Integrations
 
 The application integrates three powerful AI services to create a complete story generation pipeline:

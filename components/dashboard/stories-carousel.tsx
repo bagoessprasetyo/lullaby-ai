@@ -1,13 +1,14 @@
 // components/dashboard/stories-carousel.tsx
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Play, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Story } from "@/types/story";
+import { getStoryImageUrl } from "@/lib/image-utils";
 import { FormattedDuration } from "@/components/formatted-date";
 import { useFavoriteStories } from "@/hooks/query/useStories"; // Assuming you have this hook
 import { useToggleFavorite } from "@/hooks/query/useStories"; // Assuming you have this hook
@@ -34,6 +35,20 @@ export function StoriesCarousel({
   
   // For favorite toggling
   const toggleFavorite = useToggleFavorite();
+  
+  // Debug logging for stories
+  useEffect(() => {
+    console.log('Stories carousel received stories:', stories.length);
+    // Log just first 2 stories for debugging
+    if (stories.length > 0) {
+      console.log('First story in carousel:', {
+        id: stories[0].id,
+        title: stories[0].title,
+        is_favorite: stories[0].is_favorite,
+        isFavorite: stories[0].isFavorite
+      });
+    }
+  }, [stories]);
 
   // Empty state
   if (!stories || stories.length === 0) {
@@ -96,11 +111,43 @@ export function StoriesCarousel({
 
   // Handle favorite button click
   const handleFavoriteClick = (e: React.MouseEvent, story: Story) => {
-    console.log('storryyyy, ',story)
     e.stopPropagation();
+    
+    // Determine the current favorite status, check both properties
+    const currentFavoriteStatus = story.is_favorite || story.isFavorite || false;
+    const newFavoriteStatus = !currentFavoriteStatus;
+    
+    // Log useful information for debugging
+    console.log("Toggling favorite for story in carousel:", {
+      id: story.id,
+      title: story.title,
+      currentStatus: currentFavoriteStatus,
+      newStatus: newFavoriteStatus
+    });
+    
+    // Ensure we have a valid story ID
+    if (!story.id) {
+      console.error("Cannot toggle favorite: Missing story ID in carousel");
+      return;
+    }
+    
+    // Call the mutation with proper parameters
     toggleFavorite.mutate({ 
       storyId: story.id, 
-      isFavorite: !story.is_favorite 
+      isFavorite: newFavoriteStatus
+    }, {
+      // Add onSuccess callback to provide feedback
+      onSuccess: (data) => {
+        console.log("Successfully toggled favorite status in carousel:", {
+          story: story.title,
+          newStatus: newFavoriteStatus,
+          response: data
+        });
+      },
+      // Add onError callback to help diagnose issues
+      onError: (error) => {
+        console.error("Error toggling favorite status in carousel:", error);
+      }
     });
   };
 
@@ -164,17 +211,32 @@ export function StoriesCarousel({
                 {/* Story thumbnail */}
                 <Image 
                     src={
-                        story.coverImage || 
-                        (story.images && story.images.length > 0 ? 
-                        // Add leading slash if the path doesn't already have one
-                        (story.images[0].storage_path.startsWith('/') ? 
-                            story.images[0].storage_path : 
-                            `/${story.images[0].storage_path}`) : 
-                        `/images/theme-${story.theme || 'adventure'}.jpg`)
+                      (() => {
+                        // Determine image path
+                        let imagePath = null;
+                        if (story.coverImage) {
+                          imagePath = story.coverImage;
+                        } 
+                        else if (story.images && story.images.length > 0 && story.images[0].storage_path) {
+                          imagePath = story.images[0].storage_path;
+                        } 
+                        else if (story.thumbnail) {
+                          imagePath = story.thumbnail;
+                        }
+                        
+                        console.log(`Processing image for story ${story.id}:`, imagePath);
+                        // Use our shared utility function
+                        return getStoryImageUrl(imagePath, story.theme || 'adventure');
+                      })()
                     } 
                     alt={story.title}
                     fill
                     className="object-cover"
+                    onError={(e) => {
+                      console.error(`Failed to load image for story: ${story.id}`);
+                      // Try to use a fallback theme image
+                      e.currentTarget.src = `/images/theme-${story.theme || 'adventure'}.jpg`;
+                    }}
                 />
                 
                 {/* Favorite indicator */}
@@ -182,7 +244,7 @@ export function StoriesCarousel({
                   className="absolute top-2 right-2 z-20 bg-black/60 rounded-full p-1.5 transition-colors hover:bg-black/80"
                   onClick={(e) => handleFavoriteClick(e, story)}
                 >
-                  <Heart className={`h-4 w-4 ${story.is_favorite ? 'text-pink-500 fill-pink-500' : 'text-white'}`} />
+                  <Heart className={`h-4 w-4 ${(story.is_favorite || story.isFavorite) ? 'text-pink-500 fill-pink-500' : 'text-white'}`} />
                 </button>
                 
                 {/* Duration indicator */}

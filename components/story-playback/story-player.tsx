@@ -138,14 +138,22 @@ export function StoryPlayer({ story, onClose, className }: StoryPlayerProps) {
     // First check if current page has audio
     if (story.pages[currentPage]?.audioUrl) {
       audioUrl = story.pages[currentPage].audioUrl;
+      console.log("Using page-specific audio URL:", audioUrl);
     } 
     // Otherwise use the first page's audio for all pages
     else if (story.pages[0]?.audioUrl) {
       audioUrl = story.pages[0].audioUrl;
+      console.log("Using first page audio URL for all pages:", audioUrl);
+    }
+    // If no page has audio, check if the story itself has an audio URL
+    else if ((story as any).audio_url) {
+      audioUrl = (story as any).audio_url;
+      console.log("Using story-level audio URL:", audioUrl);
     }
     
     if (audioUrl) {
       if (!narratorAudioRef.current) {
+        console.log("Creating new Audio element with URL:", audioUrl);
         narratorAudioRef.current = new Audio(audioUrl);
         narratorAudioRef.current.volume = volume / 100;
         
@@ -153,19 +161,29 @@ export function StoryPlayer({ story, onClose, className }: StoryPlayerProps) {
         narratorAudioRef.current.addEventListener('timeupdate', handleTimeUpdate);
         narratorAudioRef.current.addEventListener('loadedmetadata', handleMetadataLoaded);
         narratorAudioRef.current.addEventListener('ended', handleAudioEnded);
-        narratorAudioRef.current.addEventListener('canplaythrough', () => setIsAudioLoaded(true));
-        narratorAudioRef.current.addEventListener('error', () => console.error('Audio error'));
+        narratorAudioRef.current.addEventListener('canplaythrough', () => {
+          console.log("Audio can play through");
+          setIsAudioLoaded(true);
+        });
+        narratorAudioRef.current.addEventListener('error', (e) => {
+          console.error('Audio error:', e);
+          // Try again with a different audio format or source if needed
+        });
       } else {
         // If audio is different, update the source
         if (narratorAudioRef.current.src !== audioUrl) {
+          console.log("Updating audio source to:", audioUrl);
           narratorAudioRef.current.src = audioUrl;
           narratorAudioRef.current.load();
         }
       }
+    } else {
+      console.warn("No audio URL found for this story or its pages");
     }
     
     // Set up background music if available
     if (story.backgroundMusicUrl && !backgroundMusicRef.current) {
+      console.log("Setting up background music:", story.backgroundMusicUrl);
       backgroundMusicRef.current = new Audio(story.backgroundMusicUrl);
       backgroundMusicRef.current.loop = true;
       backgroundMusicRef.current.volume = (volume / 100) * 0.3; // Lower volume for background music

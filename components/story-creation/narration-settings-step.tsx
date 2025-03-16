@@ -28,7 +28,6 @@ import {
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { cn } from "@/lib/utils";
 import { useUpgradeModal } from "@/hooks/useUpgradeModal";
-import { LivePreview } from "./live-preview";
 import { VoiceRecorder } from "./voice-recorder";
 
 interface NarrationSettingsStepProps {
@@ -112,15 +111,30 @@ export function NarrationSettingsStep({
           throw new Error(data.error || 'Failed to fetch voices');
         }
         
-        // Filter voices to include only those with appropriate labels
+        // Filter voices to include only those with appropriate labels and for the current language
+        const languageCodeMap: Record<string, string> = {
+          'english': 'en',
+          'indonesian': 'id'
+        };
+        
+        const currentLanguageCode = languageCodeMap[formData.language] || 'en';
+        
         const filteredVoices = data.voices.filter((voice: any) => {
-          // Include voices marked as professional or that have specific kid-friendly labels
-          return voice.category === 'professional' || 
+          // Base filter with kid-friendly labels
+          const baseFilter = voice.category === 'professional' || 
                  (voice.labels && (
                    voice.labels.accent === 'American' || 
                    voice.labels.description === 'storyteller' ||
                    voice.labels.use_case === 'storytelling'
                  ));
+                 
+          // Don't apply language filter for English as most voices are in English
+          if (formData.language === "english") {
+            return baseFilter;
+          }
+          
+          // For non-English languages, try to find matching voices
+          return baseFilter && voice.labels && voice.labels.language === currentLanguageCode;
         });
         
         setVoices(filteredVoices);
@@ -137,7 +151,8 @@ export function NarrationSettingsStep({
       }
     };
 
-    if (activeTab === "voice") {
+    // Load voices when on language tab, since that now includes voice selection
+    if (activeTab === "language") {
       fetchVoices();
     }
     
@@ -148,7 +163,7 @@ export function NarrationSettingsStep({
         audioRef.src = '';
       }
     };
-  }, [activeTab, formData.voice, updateFormData]);
+  }, [activeTab, formData.voice, formData.language, updateFormData]);
   
   // Language options
   const languageOptions: LanguageOption[] = [
@@ -157,18 +172,6 @@ export function NarrationSettingsStep({
       label: "English",
       nativeName: "English",
       flag: "🇺🇸"
-    },
-    {
-      id: "french",
-      label: "French",
-      nativeName: "Français",
-      flag: "🇫🇷"
-    },
-    {
-      id: "japanese",
-      label: "Japanese",
-      nativeName: "日本語",
-      flag: "🇯🇵"
     },
     {
       id: "indonesian",
@@ -308,14 +311,10 @@ export function NarrationSettingsStep({
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 mb-6">
+        <TabsList className="grid grid-cols-2 mb-6">
           <TabsTrigger value="language" className="flex items-center gap-1">
             <Globe className="h-3.5 w-3.5 mr-1" />
-            Language
-          </TabsTrigger>
-          <TabsTrigger value="voice" className="flex items-center gap-1">
-            <Volume2 className="h-3.5 w-3.5 mr-1" />
-            Voice
+            Language & Voice
           </TabsTrigger>
           <TabsTrigger value="music" className="flex items-center gap-1">
             <MusicIcon className="h-3.5 w-3.5 mr-1" />
@@ -324,271 +323,284 @@ export function NarrationSettingsStep({
           </TabsTrigger>
         </TabsList>
         
-        {/* Language Section */}
-        <TabsContent value="language" className="space-y-4 mt-0">
-          <RadioGroup 
-            value={formData.language} 
-            onValueChange={handleLanguageChange}
-            className="grid grid-cols-2 gap-3"
-          >
-            {languageOptions.map((language) => (
-              <div key={language.id}>
-                <RadioGroupItem 
-                  value={language.id} 
-                  id={`language-${language.id}`} 
-                  className="peer sr-only"
-                />
-                <Label
-                  htmlFor={`language-${language.id}`}
-                  className={cn(
-                    "flex items-center rounded-md border-2 border-gray-800 bg-gray-800/50 p-4 hover:bg-gray-800 hover:text-white peer-data-[state=checked]:border-indigo-500 peer-data-[state=checked]:bg-indigo-900/20 peer-data-[state=checked]:text-indigo-300 cursor-pointer transition-all"
-                  )}
-                >
-                  <div className="text-3xl mr-4" aria-hidden="true">
-                    {language.flag}
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium text-base mb-0.5">{language.label}</h4>
-                    <p className="text-xs text-gray-400">
-                      {language.nativeName}
-                    </p>
-                  </div>
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-          
-          {/* Language note */}
-          <Alert className="bg-gray-800 border-gray-700">
-            <Globe className="h-4 w-4 text-gray-400" />
-            <AlertDescription className="text-gray-300">
-              The story text and narration will be generated in your selected language.
-            </AlertDescription>
-          </Alert>
-          
-          {errors.language && (
-            <Alert variant="destructive" className="bg-red-900/20 border-red-800">
-              <AlertCircle className="h-4 w-4 text-red-400" />
-              <AlertDescription className="text-red-300">
-                {errors.language}
+        {/* Language & Voice Section */}
+        <TabsContent value="language" className="space-y-6 mt-0">
+          <div>
+            <h4 className="font-medium text-white flex items-center gap-2 mb-2">
+              <Globe className="h-4 w-4 text-indigo-400" />
+              Select Language
+            </h4>
+            
+            <RadioGroup 
+              value={formData.language} 
+              onValueChange={handleLanguageChange}
+              className="grid grid-cols-2 gap-3"
+            >
+              {languageOptions.map((language) => (
+                <div key={language.id}>
+                  <RadioGroupItem 
+                    value={language.id} 
+                    id={`language-${language.id}`} 
+                    className="peer sr-only"
+                  />
+                  <Label
+                    htmlFor={`language-${language.id}`}
+                    className={cn(
+                      "flex items-center rounded-md border-2 border-gray-800 bg-gray-800/50 p-4 hover:bg-gray-800 hover:text-white peer-data-[state=checked]:border-indigo-500 peer-data-[state=checked]:bg-indigo-900/20 peer-data-[state=checked]:text-indigo-300 cursor-pointer transition-all"
+                    )}
+                  >
+                    <div className="text-3xl mr-4" aria-hidden="true">
+                      {language.flag}
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-base mb-0.5">{language.label}</h4>
+                      <p className="text-xs text-gray-400">
+                        {language.nativeName}
+                      </p>
+                    </div>
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+            
+            {/* Language note */}
+            <Alert className="bg-gray-800 border-gray-700 mt-3">
+              <Globe className="h-4 w-4 text-gray-400" />
+              <AlertDescription className="text-gray-300">
+                The story text and narration will be generated in your selected language.
               </AlertDescription>
             </Alert>
-          )}
-        </TabsContent>
-        
-        {/* Voice Section */}
-        <TabsContent value="voice" className="space-y-4 mt-0">
-          <RadioGroup 
-            value={formData.voice} 
-            onValueChange={handleVoiceChange}
-            className="space-y-4"
-          >
-            {/* AI Voices */}
-            <div className="space-y-2">
-              <h4 className="font-medium text-white flex items-center gap-2">
-                <Volume2 className="h-4 w-4 text-indigo-400" />
-                AI Narration Voices
-              </h4>
-              
-              {isLoadingVoices ? (
-                <div className="flex items-center justify-center p-6 bg-gray-800/50 rounded-lg">
-                  <Loader2 className="h-5 w-5 animate-spin text-indigo-500 mr-2" />
-                  <span className="text-gray-400">Loading voices...</span>
-                </div>
-              ) : voiceError ? (
-                <Alert className="bg-red-900/20 border-red-800">
-                  <AlertCircle className="h-4 w-4 text-red-400" />
-                  <AlertDescription className="text-red-300">
-                    {voiceError}
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {voices.length > 0 ? (
-                    voices.map((voice) => (
-                      <div key={voice.voice_id} className="bg-gray-800/50 rounded-md p-3 flex items-start space-x-2">
-                        <RadioGroupItem 
-                          value={voice.voice_id} 
-                          id={voice.voice_id} 
-                          className="mt-1"
-                        />
-                        <div className="grid gap-1 w-full">
-                          <Label 
-                            htmlFor={voice.voice_id} 
-                            className="flex justify-between font-medium cursor-pointer"
-                          >
-                            <span>{voice.name}</span>
-                            <span className="text-gray-400 text-sm">
-                              {voice.labels?.gender || 'Professional'}
-                            </span>
-                          </Label>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm text-muted-foreground">
-                              {voice.labels?.description || voice.description || 'Storytelling voice'}
-                            </p>
-                            
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                "h-7 w-7",
-                                currentlyPlaying === voice.voice_id ? "text-indigo-400" : "text-gray-400"
-                              )}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                playVoiceSample(voice.voice_id);
-                              }}
+            
+            {errors.language && (
+              <Alert variant="destructive" className="bg-red-900/20 border-red-800 mt-3">
+                <AlertCircle className="h-4 w-4 text-red-400" />
+                <AlertDescription className="text-red-300">
+                  {errors.language}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+          
+          {/* Voice Selection - moved from voice tab */}
+          <div className="pt-2 border-t border-gray-800">
+            <h4 className="font-medium text-white flex items-center gap-2 mb-3">
+              <Volume2 className="h-4 w-4 text-indigo-400" />
+              Voice Selection
+            </h4>
+            
+            <RadioGroup 
+              value={formData.voice} 
+              onValueChange={handleVoiceChange}
+              className="space-y-4"
+            >
+              {/* AI Voices */}
+              <div className="space-y-2">
+                <h5 className="text-sm text-gray-300 flex items-center gap-1">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                  AI Narration Voices
+                </h5>
+                
+                {isLoadingVoices ? (
+                  <div className="flex items-center justify-center p-6 bg-gray-800/50 rounded-lg">
+                    <Loader2 className="h-5 w-5 animate-spin text-indigo-500 mr-2" />
+                    <span className="text-gray-400">Loading voices...</span>
+                  </div>
+                ) : voiceError ? (
+                  <Alert className="bg-red-900/20 border-red-800">
+                    <AlertCircle className="h-4 w-4 text-red-400" />
+                    <AlertDescription className="text-red-300">
+                      {voiceError}
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {voices.length > 0 ? (
+                      voices.map((voice) => (
+                        <div key={voice.voice_id} className="bg-gray-800/50 rounded-md p-3 flex items-start space-x-2">
+                          <RadioGroupItem 
+                            value={voice.voice_id} 
+                            id={voice.voice_id} 
+                            className="mt-1"
+                          />
+                          <div className="grid gap-1 w-full">
+                            <Label 
+                              htmlFor={voice.voice_id} 
+                              className="flex justify-between font-medium cursor-pointer"
                             >
-                              {currentlyPlaying === voice.voice_id ? (
-                                <Pause className="h-3.5 w-3.5" />
-                              ) : (
-                                <Play className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
+                              <span>{voice.name}</span>
+                              <span className="text-gray-400 text-sm">
+                                {voice.labels?.gender || 'Professional'}
+                              </span>
+                            </Label>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-muted-foreground">
+                                {voice.labels?.description || voice.description || 'Storytelling voice'}
+                              </p>
+                              
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-7 w-7",
+                                  currentlyPlaying === voice.voice_id ? "text-indigo-400" : "text-gray-400"
+                                )}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  playVoiceSample(voice.voice_id);
+                                }}
+                              >
+                                {currentlyPlaying === voice.voice_id ? (
+                                  <Pause className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Play className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            </div>
                           </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="col-span-2 p-4 text-center bg-gray-800/50 rounded-lg">
+                        <p className="text-gray-400">No voices available</p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="col-span-2 p-4 text-center bg-gray-800/50 rounded-lg">
-                      <p className="text-gray-400">No voices available</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            {/* Custom Voice Profiles */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-white flex items-center gap-2">
-                  <User className="h-4 w-4 text-indigo-400" />
-                  Your Voice Profiles
-                </h4>
-                
-                {!isSubscriber && (
-                  <Badge className="bg-amber-900/60 text-amber-300">
-                    <Lock className="h-3 w-3 mr-1" />
-                    Premium Feature
-                  </Badge>
+                    )}
+                  </div>
                 )}
               </div>
               
-              {!isSubscriber ? (
-                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-center">
-                  <p className="text-sm text-gray-400 mb-3">
-                    Upgrade to Premium to use your own voice for story narration
-                  </p>
-                  <Button 
-                    onClick={() => openModal("Custom Voice Profiles")}
-                    variant="outline" 
-                    className="bg-amber-900/30 text-amber-300 border-amber-800 hover:bg-amber-900/50"
-                    size="sm"
-                  >
-                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                    Upgrade to Premium
-                  </Button>
+              {/* Custom Voice Profiles */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-sm text-gray-300 flex items-center gap-1">
+                    <User className="h-3.5 w-3.5 text-indigo-400" />
+                    Your Voice Profiles
+                  </h5>
+                  
+                  {!isSubscriber && (
+                    <Badge className="bg-amber-900/60 text-amber-300">
+                      <Lock className="h-3 w-3 mr-1" />
+                      Premium Feature
+                    </Badge>
+                  )}
                 </div>
-              ) : mockVoiceProfiles.length === 0 ? (
-                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-center">
-                  <p className="text-sm text-gray-400 mb-3">
-                    You haven't created any voice profiles yet
-                  </p>
-                  <VoiceRecorder 
-                    onSave={(voiceData) => {
-                      console.log('Voice profile saved:', voiceData);
-                      // In a real implementation, you would upload this to your backend
-                      // and then add it to the voice profiles list
-                      alert('Voice profile created successfully!');
-                    }}
-                    isSubscriber={isSubscriber}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {mockVoiceProfiles.map((profile) => (
-                    <div 
-                      key={profile.id} 
-                      className={cn(
-                        "flex items-center space-x-3 p-3 border rounded-lg",
-                        formData.voice === profile.id 
-                          ? "bg-indigo-900/20 border-indigo-800" 
-                          : "bg-gray-800/50 border-gray-700 hover:bg-gray-800"
-                      )}
+                
+                {!isSubscriber ? (
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-center">
+                    <p className="text-sm text-gray-400 mb-3">
+                      Upgrade to Premium to use your own voice for story narration
+                    </p>
+                    <Button 
+                      onClick={() => openModal("Custom Voice Profiles")}
+                      variant="outline" 
+                      className="bg-amber-900/30 text-amber-300 border-amber-800 hover:bg-amber-900/50"
+                      size="sm"
                     >
-                      <RadioGroupItem 
-                        value={profile.id} 
-                        id={profile.id} 
-                        className="mt-0"
-                      />
-                      
-                      <Avatar className="h-9 w-9">
-                        <AvatarFallback className="bg-indigo-900/50 text-indigo-300">
-                          {profile.name.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      <div className="flex-1">
-                        <Label 
-                          htmlFor={profile.id} 
-                          className="font-medium cursor-pointer"
-                        >
-                          {profile.name}
-                        </Label>
-                      </div>
-                      
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
+                      <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                      Upgrade to Premium
+                    </Button>
+                  </div>
+                ) : mockVoiceProfiles.length === 0 ? (
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-center">
+                    <p className="text-sm text-gray-400 mb-3">
+                      You haven't created any voice profiles yet
+                    </p>
+                    <VoiceRecorder 
+                      onSave={(voiceData) => {
+                        console.log('Voice profile saved:', voiceData);
+                        // In a real implementation, you would upload this to your backend
+                        // and then add it to the voice profiles list
+                        alert('Voice profile created successfully!');
+                      }}
+                      isSubscriber={isSubscriber}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {mockVoiceProfiles.map((profile) => (
+                      <div 
+                        key={profile.id} 
                         className={cn(
-                          "h-8 w-8",
-                          currentlyPlaying === profile.id ? "text-indigo-400" : "text-gray-400"
+                          "flex items-center space-x-3 p-3 border rounded-lg",
+                          formData.voice === profile.id 
+                            ? "bg-indigo-900/20 border-indigo-800" 
+                            : "bg-gray-800/50 border-gray-700 hover:bg-gray-800"
                         )}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          togglePlayCustomVoice(profile.id);
-                        }}
                       >
-                        {currentlyPlaying === profile.id ? (
-                          <Pause className="h-4 w-4" />
-                        ) : (
-                          <Play className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* Add Voice Recorder for existing profiles */}
-              {isSubscriber && mockVoiceProfiles.length > 0 && (
-                <div className="mt-3 text-right">
-                  <VoiceRecorder 
-                    onSave={(voiceData) => {
-                      console.log('Voice profile saved:', voiceData);
-                      // In a real implementation, you would upload this to your backend
-                      // and then add it to the voice profiles list
-                      alert('Voice profile created successfully!');
-                    }}
-                    isSubscriber={isSubscriber}
-                  />
-                </div>
-              )}
-            </div>
-          </RadioGroup>
-          
-          {errors.voice && (
-            <Alert variant="destructive" className="bg-red-900/20 border-red-800">
-              <AlertCircle className="h-4 w-4 text-red-400" />
-              <AlertDescription className="text-red-300">
-                {errors.voice}
-              </AlertDescription>
-            </Alert>
-          )}
+                        <RadioGroupItem 
+                          value={profile.id} 
+                          id={profile.id} 
+                          className="mt-0"
+                        />
+                        
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback className="bg-indigo-900/50 text-indigo-300">
+                            {profile.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        
+                        <div className="flex-1">
+                          <Label 
+                            htmlFor={profile.id} 
+                            className="font-medium cursor-pointer"
+                          >
+                            {profile.name}
+                          </Label>
+                        </div>
+                        
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-8 w-8",
+                            currentlyPlaying === profile.id ? "text-indigo-400" : "text-gray-400"
+                          )}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            togglePlayCustomVoice(profile.id);
+                          }}
+                        >
+                          {currentlyPlaying === profile.id ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Add Voice Recorder for existing profiles */}
+                {isSubscriber && mockVoiceProfiles.length > 0 && (
+                  <div className="mt-3 text-right">
+                    <VoiceRecorder 
+                      onSave={(voiceData) => {
+                        console.log('Voice profile saved:', voiceData);
+                        // In a real implementation, you would upload this to your backend
+                        // and then add it to the voice profiles list
+                        alert('Voice profile created successfully!');
+                      }}
+                      isSubscriber={isSubscriber}
+                    />
+                  </div>
+                )}
+              </div>
+            </RadioGroup>
+            
+            {errors.voice && (
+              <Alert variant="destructive" className="bg-red-900/20 border-red-800 mt-3">
+                <AlertCircle className="h-4 w-4 text-red-400" />
+                <AlertDescription className="text-red-300">
+                  {errors.voice}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
         </TabsContent>
+        
         
         {/* Background Music Section */}
         <TabsContent value="music" className="space-y-4 mt-0">
@@ -696,12 +708,6 @@ export function NarrationSettingsStep({
         </div>
       )}
       
-      {/* Live Preview */}
-      {formData.images.length > 0 && formData.characters[0]?.name && (
-        <div className="mt-6">
-          <LivePreview formData={formData} />
-        </div>
-      )}
     </div>
   );
 }

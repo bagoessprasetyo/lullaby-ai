@@ -115,3 +115,48 @@ export function getOptimizedDimensions(
     
     return false;
   }
+  
+  /**
+   * Process a story image path to get a standardized URL
+   * Handles both Cloudinary and Supabase storage paths
+   */
+  export function getStoryImageUrl(imagePath: string | null | undefined, theme: string = 'adventure'): string {
+    // Return default image if no path provided
+    if (!imagePath) {
+      console.log(`No image path provided, using default theme: ${theme}`);
+      return `/images/theme-${theme}.jpg`;
+    }
+    
+    console.log(`Processing image path: ${imagePath}`);
+    
+    // Already a Cloudinary URL - return as is
+    if (imagePath.includes('cloudinary.com')) {
+      console.log(`Using existing Cloudinary URL: ${imagePath}`);
+      return imagePath;
+    }
+    
+    // Any other complete URL - return as is
+    if (imagePath.startsWith('http')) {
+      console.log(`Using existing URL: ${imagePath}`);
+      return imagePath;
+    }
+    
+    // Supabase storage URL - return as is
+    if (imagePath.includes('/storage/v1/object/public/')) {
+      console.log(`Using Supabase storage URL: ${imagePath}`);
+      return imagePath;
+    }
+    
+    // Extract filename for Cloudinary URL construction
+    const filename = imagePath.split('/').pop();
+    if (filename) {
+      const cloudinaryUrl = `https://res.cloudinary.com/dcx38wpwa/image/upload/v1741976467/story-app-stories/${filename}`;
+      console.log(`Constructed Cloudinary URL from filename: ${cloudinaryUrl}`);
+      return cloudinaryUrl;
+    }
+    
+    // If we can't extract filename, use the path directly
+    const fallbackUrl = `https://res.cloudinary.com/dcx38wpwa/image/upload/v1741976467/story-app-stories/${imagePath}`;
+    console.log(`Using fallback Cloudinary URL: ${fallbackUrl}`);
+    return fallbackUrl;
+  }

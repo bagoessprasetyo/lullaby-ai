@@ -1,11 +1,12 @@
 // hooks/query/useStories.ts - Enhanced version
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSession } from "next-auth/react";
 import { 
   getStoryById,
-  toggleStoryFavorite,
   deleteStory,
   getFavoriteStories
 } from '@/lib/services/story-service';
+import { toggleFavoriteAction } from '@/app/actions/story-actions';
 
 // Key factory for React Query cache
 const storyKeys = {
@@ -88,72 +89,136 @@ export function useToggleFavorite() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ storyId, isFavorite }: { storyId: string; isFavorite: boolean }) => 
-      toggleStoryFavorite(storyId, isFavorite),
+    mutationFn: async ({ storyId, isFavorite }: { storyId: string; isFavorite: boolean }) => {
+      // Call server action directly instead of using client service
+      try {
+        console.log(`[TOGGLE] Calling toggleFavoriteAction for story ${storyId} to ${isFavorite}`);
+        return await toggleFavoriteAction(storyId, isFavorite);
+      } catch (error) {
+        console.error('[TOGGLE] Error in toggleFavoriteAction:', error);
+        throw error;
+      }
+    },
     
     // Add optimistic update to immediately update the UI
     onMutate: async ({ storyId, isFavorite }) => {
+      console.log(`[QUERY] Optimistic update for story ${storyId}, setting is_favorite to ${isFavorite}`);
+      
       // Cancel any outgoing refetches to avoid overwriting our optimistic update
       await queryClient.cancelQueries({ queryKey: storyKeys.detail(storyId) });
+      await queryClient.cancelQueries({ queryKey: storyKeys.recent() });
+      await queryClient.cancelQueries({ queryKey: storyKeys.favorites() });
       
       // Snapshot the previous value
       const previousStory = queryClient.getQueryData(storyKeys.detail(storyId));
+      const previousRecentStories = queryClient.getQueryData(storyKeys.recent());
+      const previousFavorites = queryClient.getQueryData(storyKeys.favorites());
       
-      // Optimistically update the story in cache
-      queryClient.setQueryData(storyKeys.detail(storyId), (old: any) => ({
-        ...old,
-        is_favorite: isFavorite
-      }));
+      // Optimistically update the story in cache - handle both property names
+      queryClient.setQueryData(storyKeys.detail(storyId), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          is_favorite: isFavorite,
+          isFavorite: isFavorite
+        };
+      });
       
-      // Also update the story in any list it appears in
+      // Update story in any list it appears in - handle both property names
       queryClient.setQueriesData({ queryKey: storyKeys.recent() }, (old: any) => {
         if (!old) return old;
         
         // If it's an array of stories
         if (Array.isArray(old)) {
           return old.map(story => 
-            story.id === storyId ? { ...story, is_favorite: isFavorite } : story
+            story.id === storyId ? { 
+              ...story, 
+              is_favorite: isFavorite, 
+              isFavorite: isFavorite 
+            } : story
           );
         }
         
         return old;
       });
       
-      // Also update favorites list
+      // Also update favorites list - handle both property names and add/remove as needed
       queryClient.setQueriesData({ queryKey: storyKeys.favorites() }, (old: any) => {
         if (!old) return old;
         
         if (Array.isArray(old)) {
           // If removing from favorites, filter it out
           if (!isFavorite) {
+            console.log(`[QUERY] Removing story ${storyId} from favorites list (optimistic)`);
             return old.filter(story => story.id !== storyId);
           }
-          // If adding to favorites, it might not be in the list yet
+          
+          // If adding to favorites and it's not already in the list
+          if (!old.some(story => story.id === storyId)) {
+            console.log(`[QUERY] Story ${storyId} not found in favorites, may need server refresh`);
+            // We can't add it here as we don't have the full story data
+            return old;
+          }
+          
+          // If it's in the list, update it
           return old.map(story => 
-            story.id === storyId ? { ...story, is_favorite: isFavorite } : story
+            story.id === storyId ? { 
+              ...story, 
+              is_favorite: isFavorite, 
+              isFavorite: isFavorite 
+            } : story
           );
         }
         
         return old;
       });
       
-      // Return the snapshot for rollback if needed
-      return { previousStory };
+      // Return previous values for rollback
+      return { 
+        previousStory, 
+        previousRecentStories,
+        previousFavorites
+      };
     },
     
-    // If error, roll back to the previous value
-    onError: (err, { storyId }, context) => {
-      console.error('Error toggling favorite:', err);
+    // If error, roll back to the previous values
+    onError: (err, { storyId }, context: any) => {
+      console.error('[QUERY] Error toggling favorite:', err);
+      
+      // Restore story detail if available
       if (context?.previousStory) {
         queryClient.setQueryData(storyKeys.detail(storyId), context.previousStory);
       }
-      // Also roll back any list updates
+      
+      // Restore recent stories list if available
+      if (context?.previousRecentStories) {
+        queryClient.setQueryData(storyKeys.recent(), context.previousRecentStories);
+      }
+      
+      // Restore favorites list if available
+      if (context?.previousFavorites) {
+        queryClient.setQueryData(storyKeys.favorites(), context.previousFavorites);
+      }
+      
+      // Also invalidate affected queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: storyKeys.all });
     },
     
-    // Always refetch after error or success to ensure data consistency
-    onSettled: (data, error, { storyId }) => {
+    // On success
+    onSuccess: (data, { storyId, isFavorite }) => {
+      console.log(`[QUERY] Successfully toggled favorite for story ${storyId} to ${isFavorite}`, data);
+      
+      // Force refetch to ensure our lists are up to date
+      queryClient.invalidateQueries({ queryKey: storyKeys.recent() });
+      queryClient.invalidateQueries({ queryKey: storyKeys.favorites() });
       queryClient.invalidateQueries({ queryKey: storyKeys.detail(storyId) });
+    },
+    
+    // Always refetch after error or success to ensure data consistency
+    onSettled: () => {
+      console.log('[QUERY] Favorite toggle settled, refreshing all story data');
+      // Invalidate all story data to ensure everything is consistent
+      queryClient.invalidateQueries({ queryKey: storyKeys.all });
     },
   });
 }
@@ -228,10 +293,36 @@ export function useDeleteStory() {
 }
 
 // Hook to fetch favorite stories
-export function useFavoriteStories(limit = '3') {
+export function useFavoriteStories(options: {
+  limit?: number;
+  initialData?: any[];
+} = {}) {
+  const { limit = 4, initialData } = options;
+  
+  // Get the session to access user ID
+  const { data: session } = useSession();
+  
   return useQuery({
     queryKey: storyKeys.favorites(),
-    queryFn: () => getFavoriteStories(limit),
+    queryFn: async () => {
+      // Check if session exists and has user ID
+      if (!session?.user?.id) {
+        console.error('No user ID available in useFavoriteStories');
+        return [];
+      }
+      
+      console.log(`[Query] Fetching favorite stories for user: ${session.user.id} with limit: ${limit}`);
+      try {
+        const data = await getFavoriteStories(session.user.id, limit);
+        console.log(`[Query] Successfully fetched ${data.length} favorite stories`);
+        return data;
+      } catch (error) {
+        console.error(`[Query] Error fetching favorite stories:`, error);
+        throw error;
+      }
+    },
+    initialData, // Use initial data if provided from SSR
     staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!session?.user?.id, // Only run if we have a user ID
   });
 }

@@ -23,7 +23,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { StoryFormData } from "@/app/dashboard/create/page";
 import { useUpgradeModal } from "@/hooks/useUpgradeModal";
 import { cn } from "@/lib/utils";
-import { LivePreview } from "./live-preview";
 
 interface StoryDetailsStepProps {
   formData: StoryFormData;
@@ -325,12 +324,6 @@ export function StoryDetailsStep({
         </div>
       </div>
       
-      {/* Live Preview */}
-      {formData.images.length > 0 && formData.characters[0]?.name && (
-        <div className="mt-5">
-          <LivePreview formData={formData} className="mb-4" />
-        </div>
-      )}
       
       {/* Character Tips */}
       <div className="bg-gray-800/50 rounded-lg p-3 text-sm mt-3">

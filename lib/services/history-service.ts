@@ -161,7 +161,14 @@ export async function getPlayHistory(
       // Get cover image from the first image if available
       let coverImage = defaultCoverImage;
       if (storyData && storyData.images && storyData.images.length > 0) {
-        coverImage = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${storyData.images[0].storage_path}`;
+        const imagePath = storyData.images[0].storage_path;
+        // Check if path is already a full URL
+        if (imagePath.startsWith('http')) {
+          coverImage = imagePath;
+        } else {
+          coverImage = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${imagePath}`;
+        }
+        console.log(`Generated cover image path: ${coverImage} from storage_path: ${imagePath}`);
       }
       
       return {

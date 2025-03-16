@@ -44,10 +44,12 @@ export function OptimizedImage({
     return null;
   }
   
-  // For Supabase storage URLs, we need special handling
-  const isSupabaseUrl = imgSrc.includes('storage/v1/object/public');
+  // For Supabase storage URLs and Cloudinary URLs, we need special handling
+  const isExternalUrl = imgSrc.includes('storage/v1/object/public') || 
+                         imgSrc.includes('supabase') || 
+                         imgSrc.includes('cloudinary.com');
   
-  if (isSupabaseUrl) {
+  if (isExternalUrl) {
     return (
       <div className={cn("relative overflow-hidden", className)}>
         {isLoading && (
@@ -69,6 +71,7 @@ export function OptimizedImage({
           )}
           onLoad={() => setIsLoading(false)}
           onError={() => {
+            console.error(`Failed to load image: ${imgSrc}`);
             setIsLoading(false);
             if (onError) onError();
             else setImgSrc('/images/placeholder.jpg'); // Fallback image

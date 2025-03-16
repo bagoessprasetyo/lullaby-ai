@@ -460,36 +460,6 @@ export function EnhancedSearchBar({
                 
                 <DropdownMenuSeparator />
                 
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="text-xs text-gray-500">Time Period</DropdownMenuLabel>
-                  
-                  <DropdownMenuItem 
-                    onClick={() => applyFilter('dateRange', 'today')}
-                    className={filters.dateRange === 'today' ? 'bg-indigo-500/10 text-indigo-400' : ''}
-                  >
-                    <Clock className="mr-2 h-4 w-4" />
-                    Today
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
-                    onClick={() => applyFilter('dateRange', 'week')}
-                    className={filters.dateRange === 'week' ? 'bg-indigo-500/10 text-indigo-400' : ''}
-                  >
-                    <Clock className="mr-2 h-4 w-4" />
-                    This Week
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
-                    onClick={() => applyFilter('dateRange', 'month')}
-                    className={filters.dateRange === 'month' ? 'bg-indigo-500/10 text-indigo-400' : ''}
-                  >
-                    <Clock className="mr-2 h-4 w-4" />
-                    This Month
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                
-                <DropdownMenuSeparator />
-                
                 <DropdownMenuItem 
                   onClick={() => applyFilter('favorites', true)}
                   className={filters.favorites ? 'bg-indigo-500/10 text-indigo-400' : ''}
@@ -568,7 +538,122 @@ export function EnhancedSearchBar({
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
           >
-            
+            <Command className="bg-transparent border-none shadow-none">
+              <CommandInput 
+                placeholder="Type to search..." 
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+                className="border-b border-gray-700"
+              />
+              <CommandList className="py-2 max-h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <RefreshCw className="h-6 w-6 text-gray-400 animate-spin" />
+                    <span className="ml-2 text-gray-400">Searching stories...</span>
+                  </div>
+                ) : searchQuery.trim() || Object.keys(filters).length > 0 ? (
+                  <>
+                    {/* Search Results */}
+                    {searchResults.length > 0 ? (
+                      <CommandGroup heading="Results">
+                        {searchResults.map((story) => (
+                          <CommandItem
+                            key={story.id}
+                            onSelect={() => handleResultClick(story.id)}
+                            className="flex items-center py-2 px-2 cursor-pointer"
+                          >
+                            <div className="relative w-10 h-10 rounded overflow-hidden mr-3 flex-shrink-0">
+                              {story.coverImage || (story.images && story.images.length > 0) ? (
+                                <Image
+                                  src={story.coverImage || 
+                                    (story.images && story.images.length > 0 && story.images[0].storage_path ?
+                                      (story.images[0].storage_path.includes('cloudinary.com') ? 
+                                        story.images[0].storage_path :
+                                        `https://res.cloudinary.com/dcx38wpwa/image/upload/v1741976467/story-app-stories/${story.images[0].storage_path.split('/').pop()}`) :
+                                      `/images/theme-${story.theme || 'adventure'}.jpg`)}
+                                  alt={story.title}
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                getThemeIcon(story.theme || 'adventure')
+                              )}
+                            </div>
+                            <div className="overflow-hidden">
+                              <div className="font-medium text-white truncate">{story.title}</div>
+                              <div className="text-xs text-gray-400 flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                <ClientDate date={story.created_at} format="short" />
+                                {story.is_favorite && <Heart className="h-3 w-3 ml-2 fill-pink-500 text-pink-500" />}
+                              </div>
+                            </div>
+                          </CommandItem>
+                        ))}
+                        {searchResults.length > 5 && (
+                          <div className="px-2 py-1.5 text-center">
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="text-indigo-400 hover:text-indigo-300 text-xs"
+                              onClick={() => {
+                                router.push(`/dashboard/library?q=${encodeURIComponent(searchQuery.trim())}`);
+                                setShowSearchResults(false);
+                              }}
+                            >
+                              See all {searchResults.length} results
+                            </Button>
+                          </div>
+                        )}
+                      </CommandGroup>
+                    ) : (
+                      <CommandEmpty className="py-6 text-center text-gray-400">
+                        No stories found matching your search
+                      </CommandEmpty>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* Recent Searches */}
+                    {recentQueries.length > 0 && (
+                      <CommandGroup heading="Recent Searches">
+                        {recentQueries.map((query, index) => (
+                          <CommandItem
+                            key={index}
+                            onSelect={() => {
+                              setSearchQuery(query);
+                              searchRef.current?.focus();
+                              performSearch();
+                            }}
+                            className="flex items-center cursor-pointer"
+                          >
+                            <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                            <span>{query}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                    
+                    {/* Navigation Suggestions */}
+                    <CommandGroup heading="Quick Navigation">
+                      <CommandItem
+                        onSelect={() => router.push("/dashboard/library")}
+                        className="cursor-pointer"
+                      >
+                        <Book className="h-4 w-4 mr-2 text-indigo-400" />
+                        <span>View All Stories</span>
+                      </CommandItem>
+                      <CommandItem
+                        onSelect={() => router.push("/dashboard/create")}
+                        className="cursor-pointer"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2 text-purple-400" />
+                        <span>Create New Story</span>
+                      </CommandItem>
+                    </CommandGroup>
+                  </>
+                )}
+              </CommandList>
+            </Command>
           </motion.div>
         )}
       </AnimatePresence>

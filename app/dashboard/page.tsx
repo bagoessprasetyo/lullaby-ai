@@ -22,27 +22,50 @@ export default async function DashboardPage() {
   }
 
   // Pre-fetch critical data in parallel for initial render
-  const [
-    recentStories, 
-    storyCount, 
-    subscriptionFeatures, 
-    favoriteStories,
-    playHistory,
-    listeningStats,
-    streakData,
-    listeningPatterns,
-    userPreferences
-  ] = await Promise.all([
-    getRecentStories(session.user.id, 5),
-    getStoryCount(session.user.id),
-    getSubscriptionFeatures(),
-    getFavoriteStories(session.user.id, 4),
-    getPlayHistory(session.user.id, { timeRange: '30days', limit: 5 }),
-    getListeningStats(session.user.id),
-    getUserStreak(session.user.id),
-    getListeningPatterns(session.user.id),
-    getUserPreferences(session.user.id).catch(() => ({})) // Fallback to empty object if not found
-  ]);
+  // Log session id for debugging
+  console.log(`Dashboard: Fetching data for user ${session.user.id}`);
+  
+  let recentStories = [];
+  let storyCount = 0;
+  let subscriptionFeatures = {};
+  let favoriteStories = [];
+  let playHistory = { history: [] };
+  let listeningStats = { totalPlays: 0, totalDuration: 0, currentStreak: 0, longestStreak: 0, averagePerDay: 0, mostPlayedStory: null };
+  let streakData = { currentStreak: 0, longestStreak: 0, lastListenedDate: null, streakHistory: [] };
+  let listeningPatterns = { hourlyDistribution: [], weekdayDistribution: [] };
+  let userPreferences = {};
+  
+  try {
+    [
+      recentStories, 
+      storyCount, 
+      subscriptionFeatures, 
+      favoriteStories,
+      playHistory,
+      listeningStats,
+      streakData,
+      listeningPatterns,
+      userPreferences
+    ] = await Promise.all([
+      getRecentStories(session.user.id, 5),
+      getStoryCount(session.user.id),
+      getSubscriptionFeatures(),
+      getFavoriteStories(session.user.id, 4).then(data => {
+        console.log(`Dashboard: Successfully fetched ${data.length} favorite stories`);
+        return data;
+      }).catch(error => {
+        console.error(`Dashboard: Error fetching favorite stories: ${error}`);
+        return [];
+      }),
+      getPlayHistory(session.user.id, { timeRange: '30days', limit: 5 }),
+      getListeningStats(session.user.id),
+      getUserStreak(session.user.id),
+      getListeningPatterns(session.user.id),
+      getUserPreferences(session.user.id).catch(() => ({})) // Fallback to empty object if not found
+    ]);
+  } catch (error) {
+    console.error(`Dashboard: Error fetching data: ${error}`);
+  }
 
   return (
     <QueryProvider>

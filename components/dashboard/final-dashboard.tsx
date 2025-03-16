@@ -115,8 +115,21 @@ export function FinalDashboard({
   const {
     data: favoriteStories = initialFavoriteStories,
     isLoading: isLoadingFavorites,
+    isError: hasFavoritesError,
+    error: favoritesError,
     refetch: refetchFavorites
-  } = useFavoriteStories();
+  } = useFavoriteStories({
+    initialData: initialFavoriteStories?.length > 0 ? initialFavoriteStories : undefined,
+  });
+  
+  // Debug log for favorites 
+  console.log('Dashboard favorites data:', {
+    fromHook: favoriteStories?.length || 0,
+    initialData: initialFavoriteStories?.length || 0,
+    isLoading: isLoadingFavorites,
+    isError: hasFavoritesError,
+    errorMessage: favoritesError instanceof Error ? favoritesError.message : null
+  });
 
   // State for other data that would normally be fetched with React Query
   const [playHistory, setPlayHistory] = useState(initialPlayHistory);

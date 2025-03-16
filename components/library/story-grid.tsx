@@ -16,23 +16,33 @@ export function StoryGrid({ stories }: StoryGridProps) {
   const [optimisticStories, setOptimisticStories] = useState<Story[]>(stories);
 
   const handleToggleFavorite = async (storyId: string, currentFavorite: boolean) => {
+    console.log(`Toggling favorite for story ${storyId} from ${currentFavorite} to ${!currentFavorite}`);
+    
     // Optimistic update
     setOptimisticStories((prev) =>
       prev.map((story) =>
         story.id === storyId
-          ? { ...story, isFavorite: !currentFavorite }
+          ? { ...story, isFavorite: !currentFavorite, is_favorite: !currentFavorite }
           : story
       )
     );
 
     try {
-      await toggleFavoriteAction(storyId, !currentFavorite);
+      const result = await toggleFavoriteAction(storyId, !currentFavorite);
+      console.log(`Toggle favorite action result:`, result);
+      
+      toast({
+        title: currentFavorite ? "Removed from favorites" : "Added to favorites",
+        description: currentFavorite ? "Story removed from your favorites" : "Story added to your favorites",
+      });
     } catch (error) {
+      console.error("Error toggling favorite:", error);
+      
       // Revert optimistic update on error
       setOptimisticStories((prev) =>
         prev.map((story) =>
           story.id === storyId
-            ? { ...story, isFavorite: currentFavorite }
+            ? { ...story, isFavorite: currentFavorite, is_favorite: currentFavorite }
             : story
         )
       );

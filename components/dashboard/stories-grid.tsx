@@ -69,9 +69,36 @@ export function StoriesGrid({
 
   const handleFavoriteToggle = (e: React.MouseEvent, story: Story) => {
     e.stopPropagation();
+    
+    // Log useful information for debugging
+    console.log("Toggling favorite for story:", {
+      id: story.id,
+      title: story.title,
+      current_is_favorite: story.is_favorite
+    });
+    
+    // Ensure we have a valid story ID
+    if (!story.id) {
+      console.error("Cannot toggle favorite: Missing story ID");
+      return;
+    }
+    
+    // Call the mutation with proper parameters
     toggleFavorite.mutate({ 
       storyId: story.id, 
       isFavorite: !story.is_favorite 
+    }, {
+      // Add onSuccess callback to provide feedback
+      onSuccess: (data) => {
+        console.log("Successfully toggled favorite status:", {
+          story: story.title,
+          newStatus: !story.is_favorite
+        });
+      },
+      // Add onError callback to help diagnose issues
+      onError: (error) => {
+        console.error("Error toggling favorite status:", error);
+      }
     });
   };
 

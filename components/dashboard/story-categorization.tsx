@@ -101,6 +101,11 @@ export function StoryCategorization({
   recentlyPlayedStories = [],
   className = ""
 }: StoryCategoryProps) {
+  // Debug log for favorite stories
+  console.log('StoryCategorization received favoriteStories:', {
+    count: favoriteStories?.length || 0,
+    favoritesContent: favoriteStories
+  });
   const router = useRouter();
   const [currentTab, setCurrentTab] = useState("all");
   
@@ -123,6 +128,8 @@ export function StoryCategorization({
       ? historyEntriesToStories(recentlyPlayedStories as any)
       : [], 
     [recentlyPlayedStories]);
+
+    console.log('formatted stories ', formattedRecentlyPlayed)
   
   // Empty state
   if (allStories.length === 0) {

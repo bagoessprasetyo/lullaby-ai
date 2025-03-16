@@ -1,2 +1,15 @@
 .next
 node_modules
+.git
+.github
+.env.local
+.env.*.local
+README.md
+FEATURES.md
+SUPABASEGUIDE.md
+DEPLOYMENT.md
+.DS_Store
+*.log
+bun.lockb
+db.ref
+guide.md

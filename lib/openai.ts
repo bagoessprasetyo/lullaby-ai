@@ -350,6 +350,8 @@ export async function generateTitleForStory(content: string, language: string): 
     const cleanTitle = rawTitle
       .replace(/^["'](.*)["']$/, '$1') // Remove surrounding quotes if present
       .replace(/^Title:\s*/, '')       // Remove "Title:" prefix if present
+      .replace(/\*\*/g, '')           // Remove any asterisks used for emphasis
+      .replace(/\*/g, '')             // Remove any single asterisks
       .trim();
     
     console.log('[OpenAI] Generated title:', cleanTitle);

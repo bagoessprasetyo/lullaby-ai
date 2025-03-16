@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { cn } from '@/lib/utils';
-import { getResponsiveSizes } from '@/lib/image-utils';
+import { getResponsiveSizes, getStoryImageUrl } from '@/lib/image-utils';
 import { Story } from '@/types/story';
 
 interface StoryThumbnailProps {
@@ -26,10 +26,26 @@ export function StoryThumbnail({
 }: StoryThumbnailProps) {
   const [imageError, setImageError] = useState(false);
   
-  // Get cover image URL from the story
-  const coverImageUrl = story.images && story.images[0] && !imageError
-    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${story.images[0].storage_path}`
-    : '/images/story-placeholder.jpg';
+  // Get image path from story
+  let imagePath = null;
+  
+  if (!imageError) {
+    // Try different image sources in priority order
+    if (story.coverImage) {
+      imagePath = story.coverImage;
+    } 
+    else if (story.images && story.images.length > 0 && story.images[0].storage_path) {
+      imagePath = story.images[0].storage_path;
+    } 
+    else if (story.thumbnail) {
+      imagePath = story.thumbnail;
+    }
+  }
+  
+  // Use the utility function to get standardized URL
+  const coverImageUrl = getStoryImageUrl(imagePath, story.theme || 'adventure');
+  
+  console.log("Story thumbnail image URL:", coverImageUrl);
   
   // Determine aspect ratio class
   const aspectClasses = {

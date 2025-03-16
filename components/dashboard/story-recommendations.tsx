@@ -8,6 +8,7 @@ import { Play, Sparkles, Clock, RefreshCw, ChevronRight, Moon, Sun, Zap } from "
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Story } from "@/types/story";
+import { getStoryImageUrl } from "@/lib/image-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Recommendation {
@@ -70,6 +71,15 @@ export function StoryRecommendations({
   useEffect(() => {
     if (stories.length === 0) return;
     
+    // Log stories to help debug image issues
+    console.log("StoryRecommendations: Received stories:", stories.map(s => ({
+      id: s.id,
+      title: s.title,
+      coverImage: s.coverImage,
+      hasImages: s.images && s.images.length > 0,
+      firstImagePath: s.images && s.images.length > 0 ? s.images[0].storage_path : null
+    })));
+    
     const currentTimeOfDay = getTimeOfDay();
     setTimeOfDay(currentTimeOfDay);
     
@@ -83,8 +93,20 @@ export function StoryRecommendations({
     // Start with an empty array of recommendations
     const newRecommendations: Recommendation[] = [];
     
-    // Clone the stories array to avoid modifying the original
-    const availableStories = [...allStories];
+    // Clone and ensure all stories have proper image data
+    const availableStories = allStories.map(story => {
+      // Ensure the story has all needed properties for display
+      return {
+        ...story,
+        // If images are missing but coverImage exists, create an image entry
+        images: (!story.images || story.images.length === 0) && story.coverImage ? 
+          [{ 
+            id: `img-${story.id}`, 
+            storage_path: story.coverImage,
+            sequence_index: 0
+          }] : story.images
+      };
+    });
     
     // 1. First, try to find a time-appropriate story
     const timeAppropriateTheme = getTimeAppropriateTheme(currentTimeOfDay);
@@ -172,6 +194,15 @@ export function StoryRecommendations({
       availableStories.splice(randomIndex, 1);
     }
     
+    // Log the recommendations for debugging
+    console.log("Generated recommendations:", newRecommendations.map(rec => ({
+      title: rec.story.title,
+      reason: rec.reason,
+      coverImage: rec.story.coverImage,
+      hasImages: rec.story.images && rec.story.images.length > 0,
+      firstImagePath: rec.story.images && rec.story.images.length > 0 ? rec.story.images[0].storage_path : null
+    })));
+    
     // Update state with the new recommendations
     setRecommendations(newRecommendations);
   };
@@ -240,13 +271,39 @@ export function StoryRecommendations({
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <div className="relative h-16 w-16 rounded-md overflow-hidden mr-3">
+                <div className="relative h-16 w-16 rounded-md overflow-hidden mr-3 bg-gray-800">
+                  {/* Image from Cloudinary */}
                   <Image 
-                    src={rec.story.coverImage || `/images/theme-${rec.story.theme || 'adventure'}.jpg`} 
+                    src={getStoryImageUrl(
+                      rec.story.coverImage || 
+                      (rec.story.images && rec.story.images.length > 0 ? rec.story.images[0].storage_path : null),
+                      rec.story.theme || 'adventure'
+                    )} 
                     alt={rec.story.title}
                     fill
                     className="object-cover"
+                    onError={(e) => {
+                      console.error(`Failed to load image for story: ${rec.story.id}`, {
+                        story: rec.story.title,
+                        coverImage: rec.story.coverImage,
+                        hasImages: rec.story.images && rec.story.images.length > 0,
+                        imagePath: rec.story.images && rec.story.images.length > 0 ? rec.story.images[0].storage_path : null
+                      });
+                      // Add a theme-based background color when image fails
+                      const target = e.target as HTMLImageElement;
+                      if (target) {
+                        target.style.display = 'none';
+                      }
+                    }}
                   />
+                  
+                  {/* Theme icon shown if image fails */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    {rec.story.theme === 'adventure' && <Zap className="h-6 w-6 text-blue-500/60" />}
+                    {rec.story.theme === 'fantasy' && <Sparkles className="h-6 w-6 text-purple-500/60" />}
+                    {rec.story.theme === 'bedtime' && <Moon className="h-6 w-6 text-indigo-500/60" />} 
+                    {rec.story.theme === 'educational' && <Sun className="h-6 w-6 text-yellow-500/60" />}
+                  </div>
                 </div>
                 
                 <div className="flex-1 min-w-0">

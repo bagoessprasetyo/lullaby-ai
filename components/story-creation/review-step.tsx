@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { createApiServices } from "@/lib/api/apiService";
-import { LivePreview } from "./live-preview";
 import {
   ImageIcon,
   Users,
@@ -23,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { motion } from "framer-motion";
 
 interface ReviewStepProps {
   formData: StoryFormData;
@@ -40,7 +40,6 @@ export function ReviewStep({
   const router = useRouter();
   const { data: session } = useSession();
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [previewKey, setPreviewKey] = useState(0); // Used to force re-generation of preview
   
   // Mapping for display purposes
   const durationMap = {
@@ -64,9 +63,6 @@ export function ReviewStep({
     magical: "Magical"
   };
 
-  const refreshPreview = () => {
-    setPreviewKey(prev => prev + 1);
-  };
 
   const handleGenerateStory = async () => {
     // Reset error state
@@ -109,9 +105,9 @@ export function ReviewStep({
         </Alert>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left column: Story details */}
-        <div className="md:col-span-2">
+      <div>
+        {/* Story details */}
+        <div>
           <Card className="bg-gray-900 border-gray-800 p-5 space-y-5">
             {/* Photos */}
             <div className="space-y-3">
@@ -245,43 +241,52 @@ export function ReviewStep({
           </Card>
         </div>
         
-        {/* Right column: Live preview */}
-        <div className="md:col-span-1">
-          <LivePreview 
-            key={previewKey}
-            formData={formData} 
-            className="sticky top-4" 
-            refreshPreview={refreshPreview} 
-          />
-        </div>
       </div>
       
-      {/* Generate Button */}
-      <div className="flex flex-col items-center justify-center pt-4">
-        <Button 
-          onClick={handleGenerateStory}
-          disabled={formData.isGenerating}
-          className="text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 w-full md:w-auto md:min-w-[200px] h-12"
-          size="lg"
-        >
-          {formData.isGenerating ? (
-            <>
-              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Creating Your Story...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-5 w-5 text-white" />
-              Generate Story
-            </>
+      {/* Generate Button - Enhanced for Mobile */}
+      <div className="flex flex-col items-center justify-center pt-8 pb-4">
+        <div className="w-full max-w-md px-4 sm:px-0">
+          <motion.div
+            whileTap={{ scale: 0.98 }}
+            className="relative"
+          >
+            <Button 
+              onClick={handleGenerateStory}
+              disabled={formData.isGenerating}
+              className="text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 w-full h-14 rounded-xl shadow-lg"
+              size="lg"
+            >
+              {formData.isGenerating ? (
+                <span className="flex items-center justify-center">
+                  <div className="h-5 w-5 mr-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span className="text-base">Creating Your Story...</span>
+                </span>
+              ) : (
+                <span className="flex items-center justify-center">
+                  <Sparkles className="mr-3 h-5 w-5 text-white" />
+                  <span className="text-base">Generate Story</span>
+                </span>
+              )}
+            </Button>
+            
+            {/* Add subtle animation effect around the button for attention */}
+            {!formData.isGenerating && (
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-xl blur opacity-30 group-hover:opacity-50 animate-pulse"></div>
+            )}
+          </motion.div>
+          
+          {!formData.isGenerating && (
+            <motion.p 
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="text-sm text-center text-gray-400 mt-4 flex items-center justify-center gap-1"
+            >
+              <Clock className="h-3 w-3" />
+              Your story will be created in approximately 30 seconds
+            </motion.p>
           )}
-        </Button>
-        
-        {!formData.isGenerating && (
-          <p className="text-sm text-gray-400 mt-3">
-            Your story will be created in approximately 30 seconds
-          </p>
-        )}
+        </div>
       </div>
     </div>
   );

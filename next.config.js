@@ -7,16 +7,11 @@ const nextConfig = {
     return config;
   },
   images: {
-    domains: ['*'], // Add your Supabase domain
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**', // Allow all image URLs
-      },
-      {
-        protocol: 'http',
-        hostname: '**', // Allow all image URLs
-      },
+        hostname: '**', // Allow all image URLs for development
+      }
     ],
   },
   eslint: {
