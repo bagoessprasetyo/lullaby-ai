@@ -92,8 +92,13 @@ export function EnhancedSearchBar({
         if (element instanceof HTMLElement && !element.contains(event.target as Node)) {
           setShowSearchResults(false);
         }
-      } else if (commandRef.current && !commandRef.current.contains(event.target as Node)) {
-        setShowSearchResults(false);
+      } else {
+        // Simply close the results if we can't properly check
+        // This avoids the type error with commandRef.current.contains
+        if (commandRef.current && event.target instanceof Node && 
+            !(event.target instanceof HTMLElement && searchRef.current?.contains(event.target))) {
+          setShowSearchResults(false);
+        }
       }
     };
     
