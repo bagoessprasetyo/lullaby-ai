@@ -64,7 +64,7 @@ export function EnhancedSearchBar({
   const [recentQueries, setRecentQueries] = useState<string[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  const commandRef = useRef<React.ElementRef<typeof Command>>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Initialize recent searches from localStorage on component mount
   useEffect(() => {
@@ -86,19 +86,8 @@ export function EnhancedSearchBar({
   // Handle clicks outside the search results
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Fix the type checking for commandRef.current
-      if (commandRef.current && commandRef.current instanceof Object && 'element' in commandRef.current) {
-        const element = commandRef.current.element;
-        if (element instanceof HTMLElement && !element.contains(event.target as Node)) {
-          setShowSearchResults(false);
-        }
-      } else {
-        // Simply close the results if we can't properly check
-        // This avoids the type error with commandRef.current.contains
-        if (commandRef.current && event.target instanceof Node && 
-            !(event.target instanceof HTMLElement && searchRef.current?.contains(event.target))) {
-          setShowSearchResults(false);
-        }
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
       }
     };
     
@@ -316,7 +305,7 @@ export function EnhancedSearchBar({
   };
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative ${className}`} ref={containerRef}>
       <div className="relative">
         <form onSubmit={handleSearchSubmit} className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -548,124 +537,132 @@ export function EnhancedSearchBar({
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
           >
-            <Command ref={commandRef} className="bg-transparent border-none shadow-none">
-              <CommandInput 
-                placeholder="Type to search..." 
-                value={searchQuery}
-                onValueChange={setSearchQuery}
-                className="border-b border-gray-700"
-              />
-              <CommandList>
-                <div className="py-2 max-h-80 overflow-auto">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <RefreshCw className="h-6 w-6 text-gray-400 animate-spin" />
-                    <span className="ml-2 text-gray-400">Searching stories...</span>
-                  </div>
-                ) : searchQuery.trim() || Object.keys(filters).length > 0 ? (
-                  <>
-                    {/* Search Results */}
-                    {searchResults.length > 0 ? (
-                      <CommandGroup heading="Results">
-                        {searchResults.map((story) => (
-                          <CommandItem
-                            key={story.id}
-                            onSelect={() => handleResultClick(story.id)}
-                            className="flex items-center py-2 px-2 cursor-pointer"
-                          >
-                            <div className="relative w-10 h-10 rounded overflow-hidden mr-3 flex-shrink-0">
-                              {story.coverImage || (story.images && story.images.length > 0) ? (
-                                <Image
-                                  src={story.coverImage || 
-                                    (story.images && story.images.length > 0 && story.images[0].storage_path ?
-                                      (story.images[0].storage_path.includes('cloudinary.com') ? 
-                                        story.images[0].storage_path :
-                                        `https://res.cloudinary.com/dcx38wpwa/image/upload/v1741976467/story-app-stories/${story.images[0].storage_path.split('/').pop()}`) :
-                                      `/images/theme-${story.theme || 'adventure'}.jpg`)}
-                                  alt={story.title}
-                                  fill
-                                  className="object-cover"
-                                />
-                              ) : (
-                                getThemeIcon(story.theme || 'adventure')
-                              )}
-                            </div>
-                            <div className="overflow-hidden">
-                              <div className="font-medium text-white truncate">{story.title}</div>
-                              <div className="text-xs text-gray-400 flex items-center">
-                                <Clock className="h-3 w-3 mr-1" />
-                                <ClientDate date={story.created_at} format="short" />
-                                {story.is_favorite && <Heart className="h-3 w-3 ml-2 fill-pink-500 text-pink-500" />}
+            <div className="bg-transparent border-none shadow-none">
+              <div className="flex items-center border-b px-3 border-gray-700" cmdk-input-wrapper="">
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Type to search..."
+                />
+              </div>
+              
+              <div className="max-h-[300px] overflow-y-auto overflow-x-hidden">
+                <div className="py-2">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <RefreshCw className="h-6 w-6 text-gray-400 animate-spin" />
+                      <span className="ml-2 text-gray-400">Searching stories...</span>
+                    </div>
+                  ) : searchQuery.trim() || Object.keys(filters).length > 0 ? (
+                    <>
+                      {/* Search Results */}
+                      {searchResults.length > 0 ? (
+                        <div className="overflow-hidden p-1 text-foreground">
+                          <p className="px-2 py-1.5 text-xs font-medium text-gray-400">Results</p>
+                          {searchResults.map((story) => (
+                            <div
+                              key={story.id}
+                              onClick={() => handleResultClick(story.id)}
+                              className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50"
+                            >
+                              <div className="relative w-10 h-10 rounded overflow-hidden mr-3 flex-shrink-0">
+                                {story.coverImage || (story.images && story.images.length > 0) ? (
+                                  <Image
+                                    src={story.coverImage || 
+                                      (story.images && story.images.length > 0 && story.images[0].storage_path ?
+                                        (story.images[0].storage_path.includes('cloudinary.com') ? 
+                                          story.images[0].storage_path :
+                                          `https://res.cloudinary.com/dcx38wpwa/image/upload/v1741976467/story-app-stories/${story.images[0].storage_path.split('/').pop()}`) :
+                                        `/images/theme-${story.theme || 'adventure'}.jpg`)}
+                                    alt={story.title}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  getThemeIcon(story.theme || 'adventure')
+                                )}
+                              </div>
+                              <div className="overflow-hidden">
+                                <div className="font-medium text-white truncate">{story.title}</div>
+                                <div className="text-xs text-gray-400 flex items-center">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  <ClientDate date={story.created_at} format="short" />
+                                  {story.is_favorite && <Heart className="h-3 w-3 ml-2 fill-pink-500 text-pink-500" />}
+                                </div>
                               </div>
                             </div>
-                          </CommandItem>
-                        ))}
-                        {searchResults.length > 5 && (
-                          <div className="px-2 py-1.5 text-center">
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="text-indigo-400 hover:text-indigo-300 text-xs"
+                          ))}
+                          
+                          {searchResults.length > 5 && (
+                            <div className="px-2 py-1.5 text-center">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="text-indigo-400 hover:text-indigo-300 text-xs"
+                                onClick={() => {
+                                  router.push(`/dashboard/library?q=${encodeURIComponent(searchQuery.trim())}`);
+                                  setShowSearchResults(false);
+                                }}
+                              >
+                                See all {searchResults.length} results
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="py-6 text-center text-sm text-gray-400">
+                          No stories found matching your search
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Recent Searches */}
+                      {recentQueries.length > 0 && (
+                        <div className="overflow-hidden p-1 text-foreground">
+                          <p className="px-2 py-1.5 text-xs font-medium text-gray-400">Recent Searches</p>
+                          {recentQueries.map((query, index) => (
+                            <div
+                              key={index}
                               onClick={() => {
-                                router.push(`/dashboard/library?q=${encodeURIComponent(searchQuery.trim())}`);
-                                setShowSearchResults(false);
+                                setSearchQuery(query);
+                                searchRef.current?.focus();
+                                performSearch();
                               }}
+                              className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50"
                             >
-                              See all {searchResults.length} results
-                            </Button>
-                          </div>
-                        )}
-                      </CommandGroup>
-                    ) : (
-                      <CommandEmpty className="py-6 text-center text-gray-400">
-                        No stories found matching your search
-                      </CommandEmpty>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {/* Recent Searches */}
-                    {recentQueries.length > 0 && (
-                      <CommandGroup heading="Recent Searches">
-                        {recentQueries.map((query, index) => (
-                          <CommandItem
-                            key={index}
-                            onSelect={() => {
-                              setSearchQuery(query);
-                              searchRef.current?.focus();
-                              performSearch();
-                            }}
-                            className="flex items-center cursor-pointer"
-                          >
-                            <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                            <span>{query}</span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    )}
-                    
-                    {/* Navigation Suggestions */}
-                    <CommandGroup heading="Quick Navigation">
-                      <CommandItem
-                        onSelect={() => router.push("/dashboard/library")}
-                        className="cursor-pointer"
-                      >
-                        <Book className="h-4 w-4 mr-2 text-indigo-400" />
-                        <span>View All Stories</span>
-                      </CommandItem>
-                      <CommandItem
-                        onSelect={() => router.push("/dashboard/create")}
-                        className="cursor-pointer"
-                      >
-                        <Sparkles className="h-4 w-4 mr-2 text-purple-400" />
-                        <span>Create New Story</span>
-                      </CommandItem>
-                    </CommandGroup>
-                  </>
-                )}
+                              <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                              <span>{query}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Navigation Suggestions */}
+                      <div className="overflow-hidden p-1 text-foreground">
+                        <p className="px-2 py-1.5 text-xs font-medium text-gray-400">Quick Navigation</p>
+                        <div
+                          onClick={() => router.push("/dashboard/library")}
+                          className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50"
+                        >
+                          <Book className="h-4 w-4 mr-2 text-indigo-400" />
+                          <span>View All Stories</span>
+                        </div>
+                        <div
+                          onClick={() => router.push("/dashboard/create")}
+                          className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50"
+                        >
+                          <Sparkles className="h-4 w-4 mr-2 text-purple-400" />
+                          <span>Create New Story</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </CommandList>
-            </Command>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
