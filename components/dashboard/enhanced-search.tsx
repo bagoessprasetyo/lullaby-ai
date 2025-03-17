@@ -64,7 +64,7 @@ export function EnhancedSearchBar({
   const [recentQueries, setRecentQueries] = useState<string[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  const commandRef = useRef<HTMLDivElement>(null);
+  const commandRef = useRef<React.ElementRef<typeof Command>>(null);
   
   // Initialize recent searches from localStorage on component mount
   useEffect(() => {
@@ -86,7 +86,12 @@ export function EnhancedSearchBar({
   // Handle clicks outside the search results
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (commandRef.current && !commandRef.current.contains(event.target as Node)) {
+      // Get the DOM element from the ref
+      const element = commandRef.current && 'element' in commandRef.current 
+                      ? commandRef.current.element 
+                      : commandRef.current;
+                      
+      if (element instanceof HTMLElement && !element.contains(event.target as Node)) {
         setShowSearchResults(false);
       }
     };
@@ -531,14 +536,13 @@ export function EnhancedSearchBar({
       <AnimatePresence>
         {showSearchResults && (
           <motion.div
-            ref={commandRef}
             className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border border-gray-700 bg-gray-900 shadow-lg"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
           >
-            <Command className="bg-transparent border-none shadow-none">
+            <Command ref={commandRef} className="bg-transparent border-none shadow-none">
               <CommandInput 
                 placeholder="Type to search..." 
                 value={searchQuery}
