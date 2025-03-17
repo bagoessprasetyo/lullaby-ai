@@ -86,12 +86,13 @@ export function EnhancedSearchBar({
   // Handle clicks outside the search results
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Get the DOM element from the ref
-      const element = commandRef.current && 'element' in commandRef.current 
-                      ? commandRef.current.element 
-                      : commandRef.current;
-                      
-      if (element instanceof HTMLElement && !element.contains(event.target as Node)) {
+      // Fix the type checking for commandRef.current
+      if (commandRef.current && commandRef.current instanceof Object && 'element' in commandRef.current) {
+        const element = commandRef.current.element;
+        if (element instanceof HTMLElement && !element.contains(event.target as Node)) {
+          setShowSearchResults(false);
+        }
+      } else if (commandRef.current && !commandRef.current.contains(event.target as Node)) {
         setShowSearchResults(false);
       }
     };
