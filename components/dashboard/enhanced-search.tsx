@@ -545,7 +545,8 @@ export function EnhancedSearchBar({
                 onValueChange={setSearchQuery}
                 className="border-b border-gray-700"
               />
-              <CommandList className="py-2 max-h-80">
+              <CommandList className="max-h-80">
+                <div className="py-2">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-6">
                     <RefreshCw className="h-6 w-6 text-gray-400 animate-spin" />
@@ -652,6 +653,7 @@ export function EnhancedSearchBar({
                     </CommandGroup>
                   </>
                 )}
+                </div>
               </CommandList>
             </Command>
           </motion.div>
