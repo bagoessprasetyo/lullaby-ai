@@ -10,6 +10,7 @@ export interface Story {
   language: string;
   duration: number | null;
   audio_url: string | null;
+  mixed_audio_url?: string | null; // URL to the pre-mixed audio (narration + background music)
   theme: string;
   created_at: string;
   is_favorite: boolean;
@@ -26,6 +27,7 @@ export interface Story {
   characters?: any[];
   tags?: string[];
   images?: StoryImage[];
+  hasMixedAudio?: boolean; // Flag indicating if audio has been mixed
 }
 // export type Story = {
 //   id: string;

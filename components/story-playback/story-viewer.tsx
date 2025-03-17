@@ -587,8 +587,12 @@ export default function StoryViewer({ initialStory }: StoryViewerProps) {
       language: paginatedStory.language || "english"
     };
     
-    // Add background music if available
-    if (paginatedStory.background_music && paginatedStory.background_music.storage_path) {
+    // Check if we have pre-mixed audio (narration + background music)
+    if (paginatedStory.mixed_audio_url) {
+      (playerData as any).mixedAudioUrl = paginatedStory.mixed_audio_url;
+    }
+    // Otherwise add background music if available
+    else if (paginatedStory.background_music && paginatedStory.background_music.storage_path) {
       (playerData as any).backgroundMusicUrl = paginatedStory.background_music.storage_path;
     }
     

@@ -31,6 +31,7 @@ export function historyEntryToStory(
     language: 'en', // Default to English
     duration: historyEntry.duration || null,
     audio_url: null,
+    mixed_audio_url: null, // Add mixed audio field
     theme: 'bedtime', // Default to bedtime theme
     created_at: createdAtIso,
     is_favorite: false,
@@ -38,6 +39,7 @@ export function historyEntryToStory(
     background_music_id: null,
     voice_profile_id: null,
     storage_path: null,
+    hasMixedAudio: false, // Default to no mixed audio
     coverImage: historyEntry.coverImage,
     // Optional UI properties
     thumbnail: historyEntry.coverImage,
@@ -56,10 +58,30 @@ export function historyEntriesToStories(historyEntries: any[]): Story[] {
     return [];
   }
   
-  return historyEntries.map(entry => {
+  return historyEntries.map((entry): Story => {
     if (!entry) {
       console.warn('Skipping null or undefined entry in historyEntriesToStories');
-      return null;
+      return {
+        id: 'unknown',
+        title: 'Unknown Story',
+        text_content: null,
+        language: 'en',
+        duration: null,
+        audio_url: null,
+        mixed_audio_url: null,
+        theme: 'bedtime',
+        created_at: new Date().toISOString(),
+        user_id: '',
+        is_favorite: false,
+        play_count: 0,
+        background_music_id: null,
+        voice_profile_id: null,
+        storage_path: null,
+        hasMixedAudio: false,
+        coverImage: undefined,
+        thumbnail: undefined,
+        images: []
+      };
     }
     
     // Extract story data from nested structure if available
@@ -73,6 +95,7 @@ export function historyEntriesToStories(historyEntries: any[]): Story[] {
         language: storyData.language || entry.language || 'en', // Default to English
         duration: storyData.duration || entry.duration || null,
         audio_url: storyData.audio_url || entry.audio_url || null,
+        mixed_audio_url: storyData.mixed_audio_url || entry.mixed_audio_url || null, // Use pre-mixed audio if available
         theme: storyData.theme || entry.theme || 'bedtime', // Default to bedtime theme
         created_at: storyData.created_at || entry.created_at || entry.playedAt || new Date().toISOString(),
         user_id: storyData.user_id || entry.user_id || '',
@@ -81,6 +104,7 @@ export function historyEntriesToStories(historyEntries: any[]): Story[] {
         background_music_id: storyData.background_music_id || null,
         voice_profile_id: storyData.voice_profile_id || null,
         storage_path: storyData.storage_path || null,
+        hasMixedAudio: !!storyData.mixed_audio_url || !!entry.mixed_audio_url || false, // Flag whether mixed audio is available
         // Add image properties
         coverImage: storyData.coverImage || entry.coverImage || entry.cover_image || null,
         thumbnail: storyData.thumbnail || entry.thumbnail || entry.coverImage || entry.cover_image || null,

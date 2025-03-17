@@ -8,6 +8,29 @@ import { getAdminClient } from '@/lib/supabase';
 import { rateLimiter } from '@/lib/rate-limiter';
 import { analyzeImagesWithOpenAI, generateStoryWithOpenAI, generateTitleForStory } from '@/lib/openai';
 import { buildEnhancedStoryPrompt } from '@/lib/story-generation';
+import { mixAudioWithBackgroundMusic } from '@/lib/services/audio-mixer-service';
+
+// Helper function to check if a user is a premium subscriber
+async function isSubscriber(userId: string): Promise<boolean> {
+  try {
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('id', userId)
+      .single();
+    
+    if (error || !data) {
+      console.error('[API] Error checking subscription status:', error);
+      return false;
+    }
+    
+    return data.subscription_tier === 'premium' || data.subscription_tier === 'premium_plus';
+  } catch (error) {
+    console.error('[API] Exception checking subscription status:', error);
+    return false;
+  }
+}
 
 // Move Cloudinary configuration to runtime
 const configureCloudinary = () => {
@@ -390,6 +413,55 @@ And they all lived happily ever after.`
       console.log(`[API] Audio uploaded to Cloudinary: ${audioUrl}`);
       console.timeEnd('elevenlabs-tts');
       
+      // Mix with background music if required
+      if (backgroundMusic && await isSubscriber(userId)) {
+        console.log(`[API] Mixing audio with background music: ${backgroundMusic}`);
+        console.time('audio-mixing');
+        try {
+          // If backgroundMusic is not a UUID, look it up by category
+          let backgroundMusicId = backgroundMusic;
+          const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          
+          if (!uuidPattern.test(backgroundMusic)) {
+            // It's a category name, look up the first matching track
+            console.log(`[API] Looking up background music by category: ${backgroundMusic}`);
+            const adminClient = getAdminClient();
+            const { data: musicData, error: musicError } = await adminClient
+              .from('background_music')
+              .select('id')
+              .eq('category', backgroundMusic)
+              .limit(1)
+              .single();
+            
+            if (musicError || !musicData) {
+              console.error('[API] Error finding background music:', musicError);
+            } else {
+              backgroundMusicId = musicData.id;
+              console.log(`[API] Found background music ID: ${backgroundMusicId}`);
+            }
+          }
+          
+          // Mix audio with background music
+          if (backgroundMusicId) {
+            const mixResult = await mixAudioWithBackgroundMusic(
+              audioUrl,
+              backgroundMusicId,
+              0.25 // Setting background music at 25% volume
+            );
+            
+            if (mixResult && mixResult.mixedAudioUrl) {
+              console.log(`[API] Audio mixed successfully: ${mixResult.mixedAudioUrl}`);
+              // Update the audioUrl to the mixed version
+              audioUrl = mixResult.mixedAudioUrl;
+            }
+          }
+          console.timeEnd('audio-mixing');
+        } catch (mixingError) {
+          console.error('[API] Error mixing audio with background music:', mixingError);
+          // Continue with unmixed audio if mixing fails
+        }
+      }
+      
     } catch (audioError) {
       console.error('[API] Error generating or uploading audio:', audioError);
       // Continue without audio, but log the error
@@ -462,6 +534,7 @@ And they all lived happily ever after.`
           duration: durationSeconds, // Using the converted integer value
           language,
           audio_url: audioUrl, // Save the actual audio URL
+          mixed_audio_url: audioUrl, // If we've mixed the audio, this will have the mixed version
           background_music_id: backgroundMusicId, // Using the resolved UUID or null
           voice_profile_id: null, // Default to system voice
           storage_path: audioUrl ? `story-app-audio/${storyId}-audio` : null
@@ -532,6 +605,7 @@ And they all lived happily ever after.`
         textContent: storyData.content,
         audioUrl: audioUrl, // Return the real audio URL
         duration: durationSeconds,
+        hasMixedAudio: audioUrl !== null && backgroundMusicId !== null, // Flag indicating if audio has been mixed
       };
       
       console.log('[API] Story generation successful, returning response');
