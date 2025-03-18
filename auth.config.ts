@@ -56,12 +56,12 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/",
     // Optional: customize other pages
-    // error: '/auth/error',
+    error: '/auth/error',
     // signOut: '/auth/signout'
   },
 
   // Enable debug logs only in development
-  debug: process.env.NODE_ENV === "development",
+  debug: process.env.NODE_ENV === "development" || process.env.DEBUG_AUTH === "true",
 
   // Callbacks for customizing authentication behavior
   callbacks: {
@@ -174,11 +174,40 @@ export const authOptions: NextAuthOptions = {
   // Optional: Add events for logging
   events: {
     async signIn(message) {
-      console.log('User signed in:', message.user.email);
+      console.log('[AUTH EVENT] User signed in:', {
+        email: message.user.email,
+        name: message.user.name,
+        provider: message.account?.provider,
+        timestamp: new Date().toISOString()
+      });
     },
     async signOut(message) {
-      console.log('User signed out:', message.session?.user?.email);
-    }
+      console.log('[AUTH EVENT] User signed out:', {
+        email: message.session?.user?.email,
+        timestamp: new Date().toISOString()
+      });
+    },
+    async createUser(message) {
+      console.log('[AUTH EVENT] New user created:', {
+        id: message.user.id,
+        email: message.user.email
+      });
+    },
+    async linkAccount(message) {
+      console.log('[AUTH EVENT] Account linked:', {
+        provider: message.account.provider,
+        userId: message.user.id
+      });
+    },
+    async session(message) {
+      // Log basic session information (careful with frequency)
+      if (Math.random() < 0.1) { // Only log ~10% of sessions to avoid excessive logs
+        console.log('[AUTH EVENT] Session accessed:', {
+          userId: message.session.user?.id,
+          timestamp: new Date().toISOString()
+        });
+      }
+    },
   },
   jwt: {
     // Important: This secret must match NEXTAUTH_SECRET
