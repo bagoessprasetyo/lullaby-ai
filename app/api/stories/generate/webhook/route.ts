@@ -1,20 +1,12 @@
-// app/api/stories/generate/webhook/route.ts
+// pages/api/stories/generate/webhook.ts
+import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/auth.config';
 import { rateLimiter } from '@/lib/rate-limiter';
 import { getAdminClient } from '@/lib/supabase';
-import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 
-// Force the route to be fully dynamic and never statically optimized
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs'; // Explicitly use Node.js runtime
-
-// Prevent Vercel from attempting to collect this route during build
-export const preferredRegion = 'auto';
-export const maxDuration = 300; // 5 minutes in seconds
-
-// Initialize Cloudinary (moved to inside the POST handler to avoid initialization during build)
+// Configure Cloudinary only at runtime
 const initCloudinary = () => {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
@@ -24,21 +16,23 @@ const initCloudinary = () => {
   });
 };
 
-export async function POST(req: NextRequest) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   console.log('[WEBHOOK] Story generation webhook request received');
   
-  // Initialize services inside the handler to prevent build-time execution
+  // Initialize Cloudinary at runtime
   initCloudinary();
   
   // Authenticate user
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(req, res, authOptions);
   
   if (!session?.user?.id) {
     console.log('[WEBHOOK] Unauthorized webhook request');
-    return new NextResponse(
-      JSON.stringify({ success: false, error: 'Unauthorized' }), 
-      { status: 401, headers: { 'Content-Type': 'application/json' } }
-    );
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
   
   console.log(`[WEBHOOK] Authenticated user: ${session.user.id}`);
@@ -51,16 +45,13 @@ export async function POST(req: NextRequest) {
     
     if (!success) {
       console.log('[WEBHOOK] Webhook rate limit exceeded');
-      return new NextResponse(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Rate limit exceeded', 
-          remaining, 
-          limit, 
-          reset 
-        }), 
-        { status: 429, headers: { 'Content-Type': 'application/json' } }
-      );
+      return res.status(429).json({ 
+        success: false, 
+        error: 'Rate limit exceeded', 
+        remaining, 
+        limit, 
+        reset 
+      });
     }
   } catch (error) {
     console.error('[WEBHOOK] Webhook rate limit error:', error);
@@ -69,30 +60,10 @@ export async function POST(req: NextRequest) {
 
   try {
     // Get the request body
-    let body;
-    try {
-      const requestText = await req.text();
-      console.log('[WEBHOOK] Request body length:', requestText.length);
-      
-      if (!requestText) {
-        return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
-      }
-      
-      try {
-        body = JSON.parse(requestText);
-      } catch (parseError) {
-        console.error('[WEBHOOK] Failed to parse webhook request body:', parseError);
-        return NextResponse.json({ 
-          error: 'Invalid JSON in request body',
-          details: parseError instanceof Error ? parseError.message : 'Unknown parsing error'
-        }, { status: 400 });
-      }
-    } catch (error) {
-      console.error('[WEBHOOK] Error reading webhook request body:', error);
-      return NextResponse.json({ 
-        error: 'Error reading request body',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, { status: 400 });
+    const body = req.body;
+    
+    if (!body) {
+      return res.status(400).json({ error: 'Empty request body' });
     }
     
     const { storyId, text, voiceId } = body;
@@ -100,7 +71,7 @@ export async function POST(req: NextRequest) {
     // Validate required parameters
     if (!storyId) {
       console.error('[WEBHOOK] Missing storyId');
-      return NextResponse.json({ error: 'Missing storyId parameter' }, { status: 400 });
+      return res.status(400).json({ error: 'Missing storyId parameter' });
     }
     
     // Generate audio using ElevenLabs if both text and voiceId are provided
@@ -119,7 +90,7 @@ export async function POST(req: NextRequest) {
         await updateStoryWithAudio(storyId, uploadResult.secure_url, uploadResult.duration);
         
         // Return success response
-        return NextResponse.json({
+        return res.status(200).json({
           success: true,
           storyId,
           audioUrl: uploadResult.secure_url,
@@ -127,11 +98,11 @@ export async function POST(req: NextRequest) {
         });
       } catch (error) {
         console.error('[WEBHOOK] Error generating or uploading audio:', error);
-        return NextResponse.json({ 
+        return res.status(500).json({ 
           success: false, 
           error: 'Failed to generate or upload audio',
           details: error instanceof Error ? error.message : 'Unknown error'
-        }, { status: 500 });
+        });
       }
     }
     
@@ -154,10 +125,7 @@ export async function POST(req: NextRequest) {
     
     if (error || !story) {
       console.error('[WEBHOOK] Error fetching story:', error);
-      return NextResponse.json(
-        { error: 'Story not found or access denied' }, 
-        { status: 404 }
-      );
+      return res.status(404).json({ error: 'Story not found or access denied' });
     }
     
     // Generate audio using ElevenLabs
@@ -174,7 +142,7 @@ export async function POST(req: NextRequest) {
     await updateStoryWithAudio(storyId, audioUploadResult.secure_url, audioUploadResult.duration);
     
     // Return success response
-    return NextResponse.json({
+    return res.status(200).json({
       success: true,
       storyId,
       audioUrl: audioUploadResult.secure_url,
@@ -183,10 +151,10 @@ export async function POST(req: NextRequest) {
     
   } catch (error) {
     console.error('[WEBHOOK] Error processing webhook:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, 
-      { status: 500 }
-    );
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
   }
 }
 
