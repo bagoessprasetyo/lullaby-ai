@@ -54,10 +54,11 @@ export const authOptions: NextAuthOptions = {
       
   // Customize authentication pages
   pages: {
-    signIn: "/",
-    // Optional: customize other pages
-    error: '/auth/error',
-    // signOut: '/auth/signout'
+    signIn: "/", // Explicitly redirect to home page for sign in
+    signOut: "/",
+    error: "/auth/error", // Use your custom error page
+    verifyRequest: "/", // If using email provider
+    newUser: "/" // For newly created users
   },
 
   // Enable debug logs only in development

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { MagnetizeButton } from "@/components/ui/magnetize-button";
 import { PricingSection } from "@/components/pricing/pricing-section";
+import AuthDebugComponent from "@/components/AuthDebugComponent";
 
 export default function Home() {
 
@@ -104,6 +105,7 @@ export default function Home() {
           className="mx-auto flex flex-col space-y-3 bg-black mt-52 lg:mt-4"
         >
           <MagnetizeButton particleCount={14}attractRadius={50} className="w-1/6 ml-4 mx-auto" />
+          <AuthDebugComponent/>
           <BentoGrid items={itemsSample} />
         </motion.div>
         <motion.div
