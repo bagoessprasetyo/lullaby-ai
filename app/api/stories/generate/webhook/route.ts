@@ -14,6 +14,9 @@ cloudinary.config({
   secure: true
 });
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export async function POST(req: NextRequest) {
   console.log('[WEBHOOK] Story generation webhook request received');
   
