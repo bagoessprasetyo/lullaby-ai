@@ -106,7 +106,7 @@ export default function Home() {
           className="mx-auto flex flex-col space-y-3 bg-black mt-52 lg:mt-4"
         >
           <MagnetizeButton particleCount={14}attractRadius={50} className="w-1/6 ml-4 mx-auto" />
-          <AuthDebugWrapper/>
+          {process.env.NODE_ENV === 'development' && <AuthDebugWrapper />}
           <BentoGrid items={itemsSample} />
         </motion.div>
         <motion.div
