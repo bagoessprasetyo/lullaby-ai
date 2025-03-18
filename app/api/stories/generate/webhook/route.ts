@@ -5,6 +5,12 @@ import { rateLimiter } from '@/lib/rate-limiter';
 import { getAdminClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/auth.config';
+// import { rateLimiter } from '@/lib/rate-limiter';
+// Add at the very top
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -14,13 +20,25 @@ cloudinary.config({
   secure: true
 });
 
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+async function configureCloudinary() {
+  if (!process.env.CLOUDINARY_CLOUD_NAME) {
+    throw new Error('CLOUDINARY_CLOUD_NAME is not configured');
+  }
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY || '',
+    api_secret: process.env.CLOUDINARY_API_SECRET || '',
+    secure: true
+  });
+}
 
 export async function POST(req: NextRequest) {
   console.log('[WEBHOOK] Story generation webhook request received');
   
-  const session = await auth();
+  // const session = await auth();
+  const session = await getServerSession(authOptions);
+  await configureCloudinary();
+  // const rateLimiter = rateLimiter();
   
   if (!session?.user?.id) {
     console.log('[WEBHOOK] Unauthorized webhook request');
