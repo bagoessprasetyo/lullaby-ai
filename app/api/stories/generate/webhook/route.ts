@@ -6,19 +6,29 @@ import { getAdminClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 
-// Force dynamic API routes in Next.js
+// Force the route to be fully dynamic and never statically optimized
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'; // Explicitly use Node.js runtime
 
-// Initialize Cloudinary once at module level
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
-  api_key: process.env.CLOUDINARY_API_KEY || '',
-  api_secret: process.env.CLOUDINARY_API_SECRET || '',
-  secure: true
-});
+// Prevent Vercel from attempting to collect this route during build
+export const preferredRegion = 'auto';
+export const maxDuration = 300; // 5 minutes in seconds
+
+// Initialize Cloudinary (moved to inside the POST handler to avoid initialization during build)
+const initCloudinary = () => {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
+    api_key: process.env.CLOUDINARY_API_KEY || '',
+    api_secret: process.env.CLOUDINARY_API_SECRET || '',
+    secure: true
+  });
+};
 
 export async function POST(req: NextRequest) {
   console.log('[WEBHOOK] Story generation webhook request received');
+  
+  // Initialize services inside the handler to prevent build-time execution
+  initCloudinary();
   
   // Authenticate user
   const session = await getServerSession(authOptions);
@@ -318,6 +328,14 @@ async function uploadAudioToCloudinaryImproved(audioDataUrl: string, storyId: an
       // It's raw base64, we need to add the prefix
       uploadData = `data:audio/mpeg;base64,${audioDataUrl}`;
     }
+    
+    // Initialize Cloudinary inside the function to ensure it's ready
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
+      api_key: process.env.CLOUDINARY_API_KEY || '',
+      api_secret: process.env.CLOUDINARY_API_SECRET || '',
+      secure: true
+    });
     
     // Set a timeout for the upload
     const uploadPromise = new Promise(async (resolve, reject) => {
