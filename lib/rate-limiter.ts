@@ -8,8 +8,17 @@ export const rateLimiter = new Ratelimit({
 });
 
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL?.startsWith('https://') 
-    ? process.env.UPSTASH_REDIS_REST_URL 
+  url: process.env.UPSTASH_REDIS_REST_URL?.startsWith('https://')
+    ? process.env.UPSTASH_REDIS_REST_URL
     : `https://${process.env.UPSTASH_REDIS_REST_URL}`,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
+
+// Add validation before creating Redis client
+if (!process.env.UPSTASH_REDIS_REST_URL) {
+  throw new Error('UPSTASH_REDIS_REST_URL environment variable is not set');
+}
+
+if (!process.env.UPSTASH_REDIS_REST_URL.startsWith('https://')) {
+  console.warn('UPSTASH_REDIS_REST_URL should start with https://, automatically prepending it');
+}
