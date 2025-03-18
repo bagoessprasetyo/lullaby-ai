@@ -32,15 +32,8 @@ async function isSubscriber(userId: string): Promise<boolean> {
   }
 }
 
-// Move Cloudinary configuration to runtime
-const configureCloudinary = () => {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true
-  });
-};
+// Add at the very top of the file
+export const dynamic = 'force-dynamic';
 
 // Duration lengths in words
 const DURATION_LENGTHS = {
@@ -302,7 +295,7 @@ And they all lived happily ever after.`
       // Call ElevenLabs API
       const apiKey = process.env.ELEVENLABS_API_KEY;
       if (!apiKey) {
-        throw new Error('ELEVENLABS_API_KEY is not configured');
+        throw new Error('ELEVENLABS_API_KEY is not configured in environment variables');
       }
       
       // Limit text length to avoid issues with ElevenLabs API
@@ -634,4 +627,14 @@ And they all lived happily ever after.`
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
+}
+
+// Move Cloudinary configuration inside the POST handler
+async function configureCloudinary() {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true
+  });
 }
