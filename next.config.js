@@ -22,6 +22,16 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    // Force exclusion of API routes from static optimization
+    unstable_includeFiles: {
+      include: [],
+      exclude: [
+        '**/api/stories/generate/webhook/**/*', 
+        '**/api/stories/generate/**/*'
+      ]
+    }
+  }
 };
 
 module.exports = nextConfig;
