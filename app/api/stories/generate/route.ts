@@ -9,7 +9,9 @@ import { rateLimiter } from '@/lib/rate-limiter';
 import { analyzeImagesWithOpenAI, generateStoryWithOpenAI, generateTitleForStory } from '@/lib/openai';
 import { buildEnhancedStoryPrompt } from '@/lib/story-generation';
 import { mixAudioWithBackgroundMusic } from '@/lib/services/audio-mixer-service';
-
+// Add at the very top of the file
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 // Helper function to check if a user is a premium subscriber
 async function isSubscriber(userId: string): Promise<boolean> {
   try {
@@ -32,8 +34,7 @@ async function isSubscriber(userId: string): Promise<boolean> {
   }
 }
 
-// Add at the very top of the file
-export const dynamic = 'force-dynamic';
+
 
 // Duration lengths in words
 const DURATION_LENGTHS = {
@@ -55,8 +56,11 @@ export async function GET() {
 // Your existing POST handler remains unchanged
 export async function POST(req: NextRequest) {
   try {
-    // Configure Cloudinary at runtime instead of during build
-    configureCloudinary();
+    // Initialize critical services first
+    await configureCloudinary();
+    
+    // Initialize rate limiter inside the handler
+    const { rateLimiter } = await import('@/lib/rate-limiter');
     
     console.log('[API] Story generation request received');
     
