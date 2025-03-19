@@ -258,7 +258,7 @@ export function MobileDashboard({
                 >
                   <div className="relative w-full h-28 rounded-t-lg overflow-hidden">
                     <Image 
-                      src={story.coverImage || `/images/theme-${story.theme || 'adventure'}.jpg`} 
+                      src={story.thumbnail || ''} 
                       alt={story.title}
                       fill
                       className="object-cover"
@@ -311,7 +311,7 @@ export function MobileDashboard({
                   >
                     <div className="relative w-full h-28 rounded-t-lg overflow-hidden">
                       <Image 
-                        src={story.coverImage || `/images/theme-bedtime.jpg`} 
+                        src={story.thumbnail || ''} 
                         alt={story.title}
                         fill
                         className="object-cover"
@@ -363,7 +363,7 @@ export function MobileDashboard({
             >
               <div className="mr-3 flex-shrink-0 relative w-12 h-12 rounded overflow-hidden">
                 <Image 
-                  src={story.coverImage || `/images/theme-${story.theme || 'adventure'}.jpg`} 
+                  src={story.thumbnail || ''} 
                   alt={story.title}
                   fill
                   className="object-cover"
