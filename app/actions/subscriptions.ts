@@ -56,8 +56,8 @@ export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | 
     const hasUsedFreeStory = (Array.isArray(storyCount) ? storyCount[0]?.count || 0 : storyCount || 0) >= 1;
     const storyLimit = subscription_tier === 'free' 
       ? (hasUsedFreeStory ? 0 : 1) // If they've already created a story, limit is 0
-      : subscription_tier === 'premium' ? 30
-      : subscription_tier === 'premium_plus' ? 100 
+      : subscription_tier === 'premium' ? 10
+      : subscription_tier === 'premium_plus' ? 25 
       : 1; // Fallback to 1
     
     // Define features based on subscription tier
@@ -73,8 +73,8 @@ export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | 
         background_music: subscription_tier !== 'free',
         
         custom_voices: subscription_tier === 'free' ? 0 : 
-                       subscription_tier === 'premium' ? 2 : 
-                       subscription_tier === 'premium_plus' ? 5 : 0,
+                       subscription_tier === 'premium' ? 1 : 
+                       subscription_tier === 'premium_plus' ? 3 : 0,
         
         educational_themes: subscription_tier === 'premium_plus',
         

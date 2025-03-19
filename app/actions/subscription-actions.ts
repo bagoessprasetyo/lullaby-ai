@@ -24,12 +24,12 @@ const SUBSCRIPTION_PLANS = {
   premium: {
     monthly: {
       name: 'Premium Monthly',
-      price: 9.99,
+      price: 7.99,
       variantId: process.env.LEMON_SQUEEZY_PREMIUM_MONTHLY_VARIANT_ID,
     },
     annual: {
       name: 'Premium Annual',
-      price: 99.99,
+      price: 89.99,
       variantId: process.env.LEMON_SQUEEZY_PREMIUM_ANNUAL_VARIANT_ID,
     }
   },
