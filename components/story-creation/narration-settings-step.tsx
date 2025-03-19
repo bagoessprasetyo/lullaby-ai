@@ -52,6 +52,7 @@ interface Voice {
   preview_url?: string;
   labels?: VoiceLabel;
   is_premium?: boolean;
+  language?: string;
 }
 
 // Language options
@@ -162,13 +163,16 @@ export function NarrationSettingsStep({
           if (formData.language === "english") {
             return baseFilter;
           }
+
+          const currentLanguageCode = formData.language === 'indonesian' ? 'id' : 'en';
           
           // For non-English languages, try to find matching voices
           // Since language is not defined in VoiceLabel type, we'll check accent or description
-          return baseFilter && voice.labels && (
-            voice.labels.accent?.toLowerCase().includes(currentLanguageCode) ||
-            voice.labels.description?.toLowerCase().includes(currentLanguageCode)
-          );
+          return baseFilter;
+          // return baseFilter && voice.labels && (
+          //   voice.language?.toLowerCase().includes(currentLanguageCode) ||
+          //   voice.language?.toLowerCase().includes(currentLanguageCode)
+          // );
         });
         
         setVoices(filteredVoices);

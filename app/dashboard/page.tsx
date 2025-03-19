@@ -12,7 +12,6 @@ import { getPlayHistory, getListeningStats, getUserStreak, getListeningPatterns,
 import { getUserPreferences } from "@/lib/services/user-service"; // You'll need to create this
 import { FinalDashboard } from '@/components/dashboard/final-dashboard';
 import { SubscriptionFeatures } from '@/types/subscription';
-import { UpgradeModal } from '@/components/upgrade-modal';
 
 export default async function DashboardPage() {
   // Get server-side session
@@ -102,6 +101,7 @@ export default async function DashboardPage() {
           console.error(`Dashboard: Error fetching subscription features: ${error}`);
           return {
             success: false,
+            tier: 'free',
             subscription_tier: 'free',
             features: {
               story_limit: 3,
@@ -115,24 +115,8 @@ export default async function DashboardPage() {
               unlimited_storage: false,
               max_images: 5
             }
-          } as SubscriptionFeatures; // Type assertion to ensure it matches SubscriptionFeatures
-        })
-        .then(features => features || { // Handle null case
-            success: false,
-            subscription_tier: 'free',
-            features: {
-              story_limit: 3,
-              long_stories: false,
-              background_music: false,
-              custom_voices: 0,
-              educational_themes: false,
-              custom_characters: false,
-              story_series: false,
-              exclusive_themes: false,
-              unlimited_storage: false,
-              max_images: 5
-            }
-          } as SubscriptionFeatures),
+          };
+        }),
       getFavoriteStories(session.user.id, 4).then(data => {
         console.log(`Dashboard: Successfully fetched ${data.length} favorite stories`);
         return data;
@@ -166,7 +150,6 @@ export default async function DashboardPage() {
           initialUserPreferences={userPreferences}
         />
       </Suspense>
-      {/* <UpgradeModal /> */}
     </QueryProvider>
   );
 }
