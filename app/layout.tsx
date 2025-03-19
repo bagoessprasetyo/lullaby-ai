@@ -6,6 +6,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { Analytics } from '@vercel/analytics/next';
 import { Toaster } from 'sonner';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 // import { Analytics } from '@upstash/ratelimit';
 // import { Toaster } from "@/components/ui/toaster";
 
@@ -31,6 +32,7 @@ export default function RootLayout({
             {children}
             <Toaster />
             <Analytics />
+            <SpeedInsights/>
           </QueryProvider>
         </AuthProvider>
       </body>
