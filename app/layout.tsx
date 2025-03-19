@@ -4,6 +4,9 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { AuthProvider } from "@/components/AuthProvider";
 import { QueryProvider } from "@/lib/providers/query-provider";
+import { Analytics } from '@vercel/analytics/next';
+import { Toaster } from 'sonner';
+// import { Analytics } from '@upstash/ratelimit';
 // import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({ subsets: ['latin'] })
@@ -26,7 +29,8 @@ export default function RootLayout({
         <AuthProvider>
           <QueryProvider>
             {children}
-            {/* <Toaster /> */}
+            <Toaster />
+            <Analytics />
           </QueryProvider>
         </AuthProvider>
       </body>
