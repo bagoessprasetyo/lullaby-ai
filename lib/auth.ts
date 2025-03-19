@@ -55,18 +55,18 @@ export async function syncUserWithSupabase(userData: {
     if (!supabase) return null;
 
     // 1. First get or create auth user
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email: userData.email,
-      email_confirm: true,
-      user_metadata: {
-        full_name: userData.name,
-        avatar_url: userData.image
-      }
-    });
+    // const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+    //   email: userData.email,
+    //   email_confirm: true,
+    //   user_metadata: {
+    //     full_name: userData.name,
+    //     avatar_url: userData.image
+    //   }
+    // });
 
-    if (authError || !authUser?.user) {
-      throw new Error(`Auth creation failed: ${authError?.message || 'Unknown error'}`);
-    }
+    // if (authError || !authUser?.user) {
+    //   throw new Error(`Auth creation failed: ${authError?.message || 'Unknown error'}`);
+    // }
 
     // 2. Now create profile with proper UUID from auth system
     const { data: profile, error: profileError } = await supabase
@@ -92,47 +92,47 @@ export async function syncUserWithSupabase(userData: {
     console.log(`[SUPABASE] Created new profile with ID: ${profile.id} for OAuth ID: ${userData.id}`);
     
     // For auth.users, use the proper auth API instead of direct table access
-    if (userData.email) {
-      try {
-        // Use the admin client specifically for auth operations
-        const adminClient = getAdminClient();
+    // if (userData.email) {
+    //   try {
+    //     // Use the admin client specifically for auth operations
+    //     const adminClient = getAdminClient();
         
-        // Check if user exists by email first - using the correct API parameters
-        const { data: userList, error: userListError } = await adminClient.auth.admin.listUsers({
-          page: 1,
-          perPage: 1,
-          // The filter needs to be applied differently
-        });
+    //     // Check if user exists by email first - using the correct API parameters
+    //     const { data: userList, error: userListError } = await adminClient.auth.admin.listUsers({
+    //       page: 1,
+    //       perPage: 1,
+    //       // The filter needs to be applied differently
+    //     });
         
-        // Filter users by email manually since the API doesn't support direct filtering
-        const existingUser = userList?.users?.find(user => user.email === userData.email);
+    //     // Filter users by email manually since the API doesn't support direct filtering
+    //     const existingUser = userList?.users?.find(user => user.email === userData.email);
         
-        if (userListError) {
-          console.error(`[SUPABASE] Error checking existing users: ${userListError.message}`);
-        } else if (!existingUser) {
-          // No existing user with this email, create one
-          const { data: newUser, error: createUserError } = await adminClient.auth.admin.createUser({
-            email: userData.email,
-            email_confirm: true,
-            user_metadata: {
-              full_name: userData.name,
-              avatar_url: userData.image,
-              oauth_id: userData.id
-            }
-          });
+    //     if (userListError) {
+    //       console.error(`[SUPABASE] Error checking existing users: ${userListError.message}`);
+    //     } else if (!existingUser) {
+    //       // No existing user with this email, create one
+    //       const { data: newUser, error: createUserError } = await adminClient.auth.admin.createUser({
+    //         email: userData.email,
+    //         email_confirm: true,
+    //         user_metadata: {
+    //           full_name: userData.name,
+    //           avatar_url: userData.image,
+    //           oauth_id: userData.id
+    //         }
+    //       });
           
-          if (createUserError) {
-            console.error(`[SUPABASE] Error creating auth user: ${createUserError.message}`);
-          } else {
-            console.log(`[SUPABASE] Successfully created auth user with email: ${userData.email}`);
-          }
-        } else {
-          console.log(`[SUPABASE] User with email ${userData.email} already exists in auth system`);
-        }
-      } catch (authError) {
-        console.error(`[SUPABASE] Exception in auth operations: ${authError}`);
-      }
-    }
+    //       if (createUserError) {
+    //         console.error(`[SUPABASE] Error creating auth user: ${createUserError.message}`);
+    //       } else {
+    //         console.log(`[SUPABASE] Successfully created auth user with email: ${userData.email}`);
+    //       }
+    //     } else {
+    //       console.log(`[SUPABASE] User with email ${userData.email} already exists in auth system`);
+    //     }
+    //   } catch (authError) {
+    //     console.error(`[SUPABASE] Exception in auth operations: ${authError}`);
+    //   }
+    // }
     
     return profile;
   } catch (error) {
