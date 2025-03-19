@@ -143,7 +143,8 @@ export function FinalDashboard({
   
   // Last login date
   const lastVisit = initialLastVisit ? new Date(initialLastVisit) : null;
-
+  console.log('initialUserPreferences ',initialUserPreferences)
+  console.log('USEEERRRNAAAMEEEE ',userName)
   // Set mounted after hydration to avoid SSR/client hydration mismatch
   useEffect(() => {
     setIsMounted(true);

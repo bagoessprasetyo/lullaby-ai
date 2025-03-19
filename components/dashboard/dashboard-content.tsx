@@ -108,7 +108,8 @@ export function DashboardContent({
   
   // Extract subscription tier
   const subscriptionTier = initialSubscriptionFeatures?.subscription_tier || 'free';
-
+  console.log('initialUserPreferences ',initialUserPreferences)
+  console.log('USEEERRRNAAAMEEEE ',userName)
   // Set mounted after hydration to avoid SSR/client hydration mismatch
   useEffect(() => {
     setIsMounted(true);

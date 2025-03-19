@@ -18,7 +18,7 @@ export async function getUserPreferences(userId: string) {
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
-      
+    console.log('PREFERENCEEESSS ', data)
     if (error) {
       console.error('Error fetching user preferences:', error);
       throw error;

@@ -1,6 +1,6 @@
-"use client";
+// Fix for components/story-creation/narration-settings-step.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,23 @@ interface NarrationSettingsStepProps {
   updateFormData: (field: keyof StoryFormData, value: any) => void;
   errors: { [key: string]: string };
   isSubscriber: boolean;
+}
+
+// Define types for the voice object
+interface VoiceLabel {
+  accent?: string;
+  description?: string;
+  use_case?: string;
+}
+
+interface Voice {
+  voice_id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  preview_url?: string;
+  labels?: VoiceLabel;
+  is_premium?: boolean;
 }
 
 // Language options
@@ -82,10 +99,11 @@ export function NarrationSettingsStep({
 }: NarrationSettingsStepProps) {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("language");
+  // Use the useUpgradeModal hook for displaying the upgrade modal
   const { openModal } = useUpgradeModal();
   
   // ElevenLabs voices state
-  const [voices, setVoices] = useState<any[]>([]);
+  const [voices, setVoices] = useState<Voice[]>([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(true);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
@@ -111,7 +129,14 @@ export function NarrationSettingsStep({
           throw new Error(data.error || 'Failed to fetch voices');
         }
         
-        // Filter voices to include only those with appropriate labels and for the current language
+        // Mark premium voices
+        const voicesWithPremiumFlag = data.voices.map((voice: Voice) => ({
+          ...voice,
+          is_premium: voice.category === 'premium' || 
+                     (voice.labels && voice.labels.use_case === 'storytelling')
+        }));
+        
+        // Filter voices based on subscription and language
         const languageCodeMap: Record<string, string> = {
           'english': 'en',
           'indonesian': 'id'
@@ -119,8 +144,13 @@ export function NarrationSettingsStep({
         
         const currentLanguageCode = languageCodeMap[formData.language] || 'en';
         
-        const filteredVoices = data.voices.filter((voice: any) => {
-          // Base filter with kid-friendly labels
+        const filteredVoices = voicesWithPremiumFlag.filter((voice: Voice) => {
+          // For free users, exclude premium voices
+          if (!isSubscriber && voice.is_premium) {
+            return false;
+          }
+          
+          // Base filter for appropriate voices
           const baseFilter = voice.category === 'professional' || 
                  (voice.labels && (
                    voice.labels.accent === 'American' || 
@@ -134,13 +164,24 @@ export function NarrationSettingsStep({
           }
           
           // For non-English languages, try to find matching voices
-          return baseFilter && voice.labels && voice.labels.language === currentLanguageCode;
+          // Since language is not defined in VoiceLabel type, we'll check accent or description
+          return baseFilter && voice.labels && (
+            voice.labels.accent?.toLowerCase().includes(currentLanguageCode) ||
+            voice.labels.description?.toLowerCase().includes(currentLanguageCode)
+          );
         });
         
         setVoices(filteredVoices);
         
-        // Auto-select first voice if none is selected
-        if (!formData.voice && filteredVoices.length > 0) {
+        // Check if current voice is valid for this user's subscription
+        const currentVoiceIsValid = 
+          formData.voice && 
+          !formData.voice.startsWith('voice-') && // Not a custom voice
+          filteredVoices.some((v: { voice_id: string; }) => v.voice_id === formData.voice);
+        
+        // Auto-select first voice if none is selected or current is invalid
+        if (!currentVoiceIsValid && filteredVoices.length > 0) {
+          console.log('Auto-selecting first valid voice:', filteredVoices[0].voice_id);
           updateFormData("voice", filteredVoices[0].voice_id);
         }
       } catch (err) {
@@ -163,7 +204,7 @@ export function NarrationSettingsStep({
         audioRef.src = '';
       }
     };
-  }, [activeTab, formData.voice, formData.language, updateFormData]);
+  }, [activeTab, formData.voice, formData.language, updateFormData, isSubscriber]);
   
   // Language options
   const languageOptions: LanguageOption[] = [
@@ -183,6 +224,13 @@ export function NarrationSettingsStep({
   
   // Music options
   const musicOptions: MusicOption[] = [
+    {
+      id: "none", // Add a none option for free users
+      label: "No Music",
+      description: "Story narration without background music",
+      icon: <Volume2 className="h-5 w-5" />,
+      color: "gray"
+    },
     {
       id: "calming",
       label: "Calming",
@@ -226,20 +274,37 @@ export function NarrationSettingsStep({
   };
   
   const handleVoiceChange = (value: string) => {
-    if (value.startsWith('custom-') && !isSubscriber) {
+    // If it's a custom voice and user is not a subscriber, show upgrade modal
+    if ((value.startsWith('voice-') || value.startsWith('custom-')) && !isSubscriber) {
       openModal("Custom Voice Profiles");
       return;
     }
+    
+    // If it's a premium voice and user is not a subscriber, show upgrade modal
+    const selectedVoice = voices.find(v => v.voice_id === value);
+    if (selectedVoice?.is_premium && !isSubscriber) {
+      openModal("Premium Voices");
+      return;
+    }
+    
     updateFormData("voice", value);
   };
   
   const handleMusicChange = (value: string) => {
-    if (!isSubscriber) {
+    // Only allow free users to select "none" - otherwise show upgrade modal
+    if (value !== "none" && !isSubscriber) {
       openModal("Background Music");
       return;
     }
     updateFormData("backgroundMusic", value);
   };
+  
+  // Set default to "none" for free users if not already set
+  useEffect(() => {
+    if (!isSubscriber && !formData.backgroundMusic) {
+      updateFormData("backgroundMusic", "none");
+    }
+  }, [isSubscriber, formData.backgroundMusic, updateFormData]);
   
   // Function to play voice sample from ElevenLabs
   const playVoiceSample = async (voiceId: string) => {
@@ -422,6 +487,8 @@ export function NarrationSettingsStep({
                             value={voice.voice_id} 
                             id={voice.voice_id} 
                             className="mt-1"
+                            // Disabled if premium voice and user is not a subscriber
+                            disabled={voice.is_premium && !isSubscriber}
                           />
                           <div className="grid gap-1 w-full">
                             <Label 
@@ -429,9 +496,17 @@ export function NarrationSettingsStep({
                               className="flex justify-between font-medium cursor-pointer"
                             >
                               <span>{voice.name}</span>
-                              <span className="text-gray-400 text-sm">
-                                {voice.labels?.gender || 'Professional'}
-                              </span>
+                              <div className="flex items-center">
+                                {voice.is_premium && !isSubscriber && (
+                                  <Badge className="mr-2 bg-amber-900/60 text-amber-300">
+                                    <Lock className="h-2.5 w-2.5 mr-0.5" />
+                                    Premium
+                                  </Badge>
+                                )}
+                                <span className="text-gray-400 text-sm">
+                                  {voice.labels?.accent}
+                                </span>
+                              </div>
                             </Label>
                             <div className="flex items-center justify-between">
                               <p className="text-sm text-muted-foreground">
@@ -448,7 +523,11 @@ export function NarrationSettingsStep({
                                 )}
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  playVoiceSample(voice.voice_id);
+                                  if (voice.is_premium && !isSubscriber) {
+                                    openModal("Premium Voices");
+                                  } else {
+                                    playVoiceSample(voice.voice_id);
+                                  }
                                 }}
                               >
                                 {currentlyPlaying === voice.voice_id ? (
@@ -623,7 +702,7 @@ export function NarrationSettingsStep({
             </div>
           ) : (
             <RadioGroup 
-              value={formData.backgroundMusic} 
+              value={formData.backgroundMusic || "none"} 
               onValueChange={handleMusicChange}
               className="grid gap-3"
             >
@@ -637,7 +716,8 @@ export function NarrationSettingsStep({
                   <Label
                     htmlFor={`music-${option.id}`}
                     className={cn(
-                      "flex items-center rounded-md border-2 border-gray-800 bg-gray-800/50 p-3 hover:bg-gray-800 hover:text-white peer-data-[state=checked]:border-indigo-500 peer-data-[state=checked]:bg-indigo-900/20 peer-data-[state=checked]:text-indigo-300 cursor-pointer transition-all"
+                      "flex items-center rounded-md border-2 border-gray-800 bg-gray-800/50 p-3 hover:bg-gray-800 hover:text-white peer-data-[state=checked]:border-indigo-500 peer-data-[state=checked]:bg-indigo-900/20 peer-data-[state=checked]:text-indigo-300 cursor-pointer transition-all",
+                      option.id === "none" && "opacity-80" // Lower opacity for "none" option
                     )}
                   >
                     <div className={`bg-${option.color}-900/40 rounded-full p-2 mr-3 text-${option.color}-400`}>

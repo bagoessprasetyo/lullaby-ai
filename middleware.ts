@@ -41,5 +41,6 @@ export default withAuth(
 export const config = {
   matcher: [
     '/((?!api|_next/static|_next/image|favicon.ico|auth|$).*)',
+    '/dashboard/:path*'  // Explicitly protect dashboard routes
   ],
 };

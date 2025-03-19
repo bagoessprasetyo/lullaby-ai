@@ -4,7 +4,7 @@ import { NextAuthOptions, User as NextAuthUser } from "next-auth";
 import { Session } from "next-auth";
 import Google from "next-auth/providers/google";
 import { JWT } from "next-auth/jwt";
-import { findUserByOAuthId, syncUserWithSupabase } from '@/lib/auth';
+import { findUserByOAuthId, getSafeSupabaseClient, syncUserWithSupabase } from '@/lib/auth';
 
 export interface CustomUser extends NextAuthUser {
     id: string;
@@ -69,17 +69,17 @@ export const authOptions: NextAuthOptions = {
     // Modify token during initial sign-in or subsequent visits
     async jwt({ token, user, account }): Promise<JWT> {
       // Initial sign in - add user details to token
+      console.log('token tokeenn ',token)
+      console.log('user tokeenn ',user)
       if (account && user) {
-        console.log('Initial sign in detected');
-        // Use the OAuth provider's unique ID
-        token.sub = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.image = user.image;
-        
-        // Add provider info to token for Supabase sync
-        token.provider = account.provider;
-        token.providerAccountId = account.providerAccountId;
+        return {
+          ...token,
+          oauthId: user.id,  // Capture original OAuth ID here
+          sub: user.id ,       // Temporarily set sub to OAuth ID until Supabase UUID exists
+          name: user.name,
+          email: user.email,
+          picture: user.image
+        };
       }
       return token;
     },
@@ -92,7 +92,8 @@ export const authOptions: NextAuthOptions = {
         // Add the user ID to the session (from OAuth provider)
         const oauthId = token.sub as string;
         customSession.user.id = oauthId;
-        
+        console.log('tokeeennnn ', token)
+        console.log('oauthhhhh', oauthId)
         // Only sync if we have an ID and Supabase URL is configured
         if (oauthId && process.env.NEXT_PUBLIC_SUPABASE_URL) {
           try {
@@ -100,8 +101,9 @@ export const authOptions: NextAuthOptions = {
             let profile = await findUserByOAuthId(oauthId);
             
             if (profile) {
+              customSession.user.id = profile.id;
               profile = await syncUserWithSupabase({
-                id: oauthId,
+                id: profile.id,
                 name: token.name as string || '',
                 email: token.email as string || '',
                 image: token.image as string || ''
@@ -120,11 +122,12 @@ export const authOptions: NextAuthOptions = {
               // Add profile data to session
               customSession.user = {
                 ...customSession.user,
-                id: profile.id, // Use the UUID from Supabase as the session user ID
-                oauthId: oauthId, // Store the original OAuth ID
-                subscriptionTier: profile.subscription_tier,
-                storyCredits: profile.story_credits,
-                voiceCredits: profile.voice_credits
+                id: profile.id || '',        // Supabase UUID or fallback
+                oauthId: (token.oauthId as string) || (token.sub as string) || '',  // Explicit OAuth ID
+                name: token.name || '',
+                email: token.email || '',
+                image: token.picture || '',
+                subscriptionTier: (token.subscriptionTier as string) || 'free'
               };
             }
           } catch (error) {
@@ -204,6 +207,7 @@ export const authOptions: NextAuthOptions = {
     async session(message) {
       // Log basic session information (careful with frequency)
       if (Math.random() < 0.1) { // Only log ~10% of sessions to avoid excessive logs
+        console.log('AUUUUTTHHH ',message)
         console.log('[AUTH EVENT] Session accessed:', {
           userId: message.session.user?.id,
           timestamp: new Date().toISOString()

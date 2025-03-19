@@ -1,32 +1,47 @@
 // app/dashboard/create/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { DashboardNavbar } from "@/components/dashboard/navbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
-  ImagePlus, 
-  Users, 
-  Mic, 
-  Sparkles, 
+  Plus, 
+  Search,
+  SlidersHorizontal,
+  Heart,
+  Calendar,
+  Clock,
+  ChevronDown,
+  X,
+  Filter,
+  PlayCircle,
+  Loader2,
   ArrowRight, 
   ArrowLeft,
   AlertCircle,
-  Check
+  Check,
+  Lock,
+  Zap,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UploadAndThemeStep } from "@/components/story-creation/upload-and-theme-step";
 import { StoryDetailsStep } from "@/components/story-creation/story-details-step";
 import { NarrationSettingsStep } from "@/components/story-creation/narration-settings-step";
-// Import our enhanced review step - we're directly replacing the old one
 import { ReviewStep } from "@/components/story-creation/review-step";
 import { EnhancedStoryGenerator } from "@/components/story-creation/async-generator";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { QuickStartTemplates } from "@/components/story-creation/quick-start-templates";
 import { motion } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
+import { useUpgradeModal } from "@/hooks/useUpgradeModal";
+import { UpgradeModal } from "@/components/upgrade-modal";
+// import { useUpgradeModal, useUpgradeModal } from "@/hooks/useUpgradeModal";
 
 // Types for our form data
 export type StoryFormData = {
@@ -57,28 +72,104 @@ const steps = [
   { 
     id: "upload-theme", 
     label: "Upload & Theme", 
-    icon: <ImagePlus className="h-4 w-4" />,
+    icon: <Plus className="h-4 w-4" />,
     description: "Upload photos and select a theme"
   },
   { 
     id: "story-details", 
     label: "Story Details", 
-    icon: <Users className="h-4 w-4" />,
+    icon: <Search className="h-4 w-4" />,
     description: "Define characters and story length"
   },
   { 
     id: "narration", 
     label: "Narration Settings", 
-    icon: <Mic className="h-4 w-4" />,
+    icon: <PlayCircle className="h-4 w-4" />,
     description: "Choose language, voice, and music"
   },
   { 
     id: "review", 
     label: "Review & Create", 
-    icon: <Sparkles className="h-4 w-4" />,
+    icon: <Check className="h-4 w-4" />,
     description: "Review your story and generate"
   }
 ];
+
+// Component to show story credit status and limits
+function StoryLimitIndicator({
+  storyLimit,
+  remainingStories,
+  hasReachedStoryLimit,
+  isSubscriber
+}: {
+  storyLimit: number;
+  remainingStories: number;
+  hasReachedStoryLimit: boolean;
+  isSubscriber: boolean;
+}) {
+  const { openModal } = useUpgradeModal();
+  
+  return (
+    <div className="bg-gray-800/60 rounded-lg p-3 mb-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "p-1.5 rounded-full",
+            hasReachedStoryLimit 
+              ? "bg-red-900/40 text-red-400" 
+              : "bg-green-900/40 text-green-400"
+          )}>
+            <Clock className="h-4 w-4" />
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-white">
+              {isSubscriber ? 'Premium Story Quota' : 'Free Tier Story Limit'}
+            </h4>
+            <p className="text-xs text-gray-400">
+              {hasReachedStoryLimit 
+                ? "You've reached your story limit for this month" 
+                : `${remainingStories} of ${storyLimit} stories remaining this month`}
+            </p>
+          </div>
+        </div>
+        
+        {!isSubscriber && (
+          <Button 
+            variant="outline"
+            size="sm"
+            className="bg-amber-900/30 text-amber-300 border-amber-800 hover:bg-amber-900/50"
+            onClick={() => openModal("Story Limit")}
+          >
+            <Zap className="mr-1.5 h-3.5 w-3.5" />
+            Upgrade
+          </Button>
+        )}
+      </div>
+      
+      {/* Progress bar */}
+      <div className="mt-2 w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+        <div 
+          className={cn(
+            "h-full rounded-full",
+            hasReachedStoryLimit 
+              ? "bg-red-500" 
+              : "bg-green-500"
+          )}
+          style={{ width: `${Math.max(0, Math.min(100, ((storyLimit - remainingStories) / storyLimit) * 100))}%` }}
+        />
+      </div>
+      
+      {hasReachedStoryLimit && !isSubscriber && (
+        <Alert className="mt-3 bg-amber-900/20 border-amber-800">
+          <AlertCircle className="h-4 w-4 text-amber-400" />
+          <AlertDescription className="text-amber-300">
+            You've reached your free story limit for this month. Upgrade to Premium for more stories!
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}
 
 export default function StoryCreationPage() {
   const { data: session, status } = useSession();
@@ -90,6 +181,14 @@ export default function StoryCreationPage() {
   
   // Use our subscription hook that uses server action
   const { features, isSubscriber, isLoading: subscriptionLoading } = useSubscription();
+  
+  // Use the subscription limits hook to get story limits
+  const { 
+    storyLimit, 
+    remainingStories, 
+    hasReachedStoryLimit,
+    isLoading: limitsLoading
+  } = useSubscriptionLimits();
   
   // Simplified validation that handles all fields in each step
   const validateStep = () => {
@@ -108,9 +207,8 @@ export default function StoryCreationPage() {
         }
         
         // Check premium themes
-        if (features && 
-            (formData.theme === "educational" || formData.theme === "customized") && 
-            !features.features.educational_themes) {
+        if (!isSubscriber && 
+            (formData.theme === "educational" || formData.theme === "customized")) {
           newErrors.theme = "Educational and customized themes require a premium subscription";
         }
         break;
@@ -123,25 +221,38 @@ export default function StoryCreationPage() {
           newErrors.characters = "Please fill in all character names";
         }
         
-        if (features && 
-            formData.duration === "long" && 
-            !features.features.long_stories) {
+        if (!isSubscriber && formData.duration === "long") {
           newErrors.duration = "Long stories are available for subscribers only";
         }
         break;
         
       case 2: // Narration Settings (Language, Voice, Music)
-        if (features && 
+        // For free users, enforce "none" for background music
+        if (!isSubscriber && 
             formData.backgroundMusic && 
-            !features.features.background_music) {
-          newErrors.backgroundMusic = "Background music requires a premium subscription";
+            formData.backgroundMusic !== "none") {
+          formData.backgroundMusic = "none"; // Auto-correct to none for free users
         }
         
-        if (features && 
-            formData.voice && 
-            formData.voice.startsWith("custom-") && 
-            !features.features.custom_voices) {
+        // For voice, verify that free users aren't using premium voices
+        const hasPremiumVoice = formData.voice && 
+                              (formData.voice.startsWith('voice-') || 
+                               formData.voice.startsWith('custom-'));
+                               
+        if (!isSubscriber && hasPremiumVoice) {
+          // If validation happens after auto-correction in the component, 
+          // this should never actually trigger
           newErrors.voice = "Custom voices require a premium subscription";
+        }
+        
+        // Validate language selection
+        if (!formData.language) {
+          newErrors.language = "Please select a language for your story";
+        }
+        
+        // Ensure a voice is selected
+        if (!formData.voice) {
+          newErrors.voice = "Please select a voice for narration";
         }
         break;
     }
@@ -151,6 +262,11 @@ export default function StoryCreationPage() {
   };
 
   const handleNext = () => {
+    // Before validation, make sure backgroundMusic is set to "none" for free users
+    if (currentStep === 2 && !isSubscriber && (!formData.backgroundMusic || formData.backgroundMusic !== "none")) {
+      updateFormData("backgroundMusic", "none");
+    }
+    
     if (validateStep()) {
       setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
     }
@@ -168,6 +284,14 @@ export default function StoryCreationPage() {
   };
 
   const handleGenerateStory = () => {
+    // Check story limit before generating
+    if (hasReachedStoryLimit && !isSubscriber) {
+      setErrors({
+        storyLimit: "You've reached your free story limit for this month. Upgrade to Premium for more stories."
+      });
+      return;
+    }
+    
     if (validateStep()) {
       // Set generating state
       updateFormData("isGenerating", true);
@@ -183,7 +307,7 @@ export default function StoryCreationPage() {
   };
 
   // Show loading state while session or subscription data is loading
-  if (status === "loading" || subscriptionLoading) {
+  if (status === "loading" || subscriptionLoading || limitsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -217,6 +341,14 @@ export default function StoryCreationPage() {
             />
           </div>
         </div>
+        
+        {/* Show story limit indicator */}
+        <StoryLimitIndicator 
+          storyLimit={storyLimit} 
+          remainingStories={remainingStories}
+          hasReachedStoryLimit={hasReachedStoryLimit}
+          isSubscriber={isSubscriber}
+        />
         
         {!formData.isGenerating && (
           <>
@@ -359,6 +491,25 @@ export default function StoryCreationPage() {
                   )}
                 </div>
                 
+                {/* Show story limit error if present */}
+                {errors.storyLimit && (
+                  <Alert variant="destructive" className="bg-red-900/20 border-red-800 mb-6">
+                    <AlertCircle className="h-4 w-4 text-red-400" />
+                    <AlertDescription className="text-red-300 flex items-center justify-between">
+                      <span>{errors.storyLimit}</span>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="ml-2 bg-red-900/30 text-red-300 border-red-800 hover:bg-red-900/50"
+                        onClick={() => useUpgradeModal()}
+                      >
+                        <Zap className="mr-1.5 h-3.5 w-3.5" />
+                        Upgrade
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 {/* Navigation Buttons - Enhanced for Mobile */}
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/90 backdrop-blur-sm border-t border-gray-800 flex items-center justify-between md:static md:bg-transparent md:backdrop-blur-none md:border-0 md:mt-8 md:p-0 z-10">
                   <div className="w-1/2 pr-2">
@@ -385,8 +536,13 @@ export default function StoryCreationPage() {
                     ) : (
                       <Button 
                         onClick={handleGenerateStory}
-                        disabled={formData.isGenerating}
-                        className="text-white bg-indigo-600 hover:bg-indigo-700 w-full h-12 md:h-auto md:w-auto flex items-center justify-center"
+                        disabled={formData.isGenerating || (hasReachedStoryLimit && !isSubscriber)}
+                        className={cn(
+                          "text-white w-full h-12 md:h-auto md:w-auto flex items-center justify-center",
+                          hasReachedStoryLimit && !isSubscriber 
+                            ? "bg-gray-700 hover:bg-gray-600" 
+                            : "bg-indigo-600 hover:bg-indigo-700"
+                        )}
                       >
                         {formData.isGenerating ? (
                           <>
@@ -410,6 +566,7 @@ export default function StoryCreationPage() {
             )}
           </Card>
         </div>
+        {/* <UpgradeModal /> */}
       </div>
     </>
   );

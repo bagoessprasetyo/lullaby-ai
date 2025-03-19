@@ -12,6 +12,7 @@ import { getPlayHistory, getListeningStats, getUserStreak, getListeningPatterns,
 import { getUserPreferences } from "@/lib/services/user-service"; // You'll need to create this
 import { FinalDashboard } from '@/components/dashboard/final-dashboard';
 import { SubscriptionFeatures } from '@/types/subscription';
+import { UpgradeModal } from '@/components/upgrade-modal';
 
 export default async function DashboardPage() {
   // Get server-side session
@@ -32,7 +33,7 @@ export default async function DashboardPage() {
     success: false,
     subscription_tier: 'free',
     features: {
-      story_limit: 3,  // Changed from 0 to match fallback
+      story_limit: 0,
       long_stories: false,
       background_music: false,
       custom_voices: 0,
@@ -41,7 +42,7 @@ export default async function DashboardPage() {
       story_series: false,
       exclusive_themes: false,
       unlimited_storage: false,
-      max_images: 5  // Changed from 0 to match fallback
+      max_images: 0
     }
   };
   let favoriteStories = [];
@@ -97,26 +98,41 @@ export default async function DashboardPage() {
       getStoryCount(session.user.id),
       // Update the subscription features promise chain
       getSubscriptionFeatures()
-        .then(features => features || {
-          success: false,
-          subscription_tier: 'free',
-          features: {
-            story_limit: 3,
-            long_stories: false,
-            background_music: false,
-            custom_voices: 0,
-            educational_themes: false,
-            custom_characters: false,
-            story_series: false,
-            exclusive_themes: false,
-            unlimited_storage: false,
-            max_images: 5
-          }
-        })
         .catch(error => {
           console.error(`Dashboard: Error fetching subscription features: ${error}`);
-          return subscriptionFeatures; // Return the initialized default
-        }),
+          return {
+            success: false,
+            subscription_tier: 'free',
+            features: {
+              story_limit: 3,
+              long_stories: false,
+              background_music: false,
+              custom_voices: 0,
+              educational_themes: false,
+              custom_characters: false,
+              story_series: false,
+              exclusive_themes: false,
+              unlimited_storage: false,
+              max_images: 5
+            }
+          } as SubscriptionFeatures; // Type assertion to ensure it matches SubscriptionFeatures
+        })
+        .then(features => features || { // Handle null case
+            success: false,
+            subscription_tier: 'free',
+            features: {
+              story_limit: 3,
+              long_stories: false,
+              background_music: false,
+              custom_voices: 0,
+              educational_themes: false,
+              custom_characters: false,
+              story_series: false,
+              exclusive_themes: false,
+              unlimited_storage: false,
+              max_images: 5
+            }
+          } as SubscriptionFeatures),
       getFavoriteStories(session.user.id, 4).then(data => {
         console.log(`Dashboard: Successfully fetched ${data.length} favorite stories`);
         return data;
@@ -150,6 +166,7 @@ export default async function DashboardPage() {
           initialUserPreferences={userPreferences}
         />
       </Suspense>
+      {/* <UpgradeModal /> */}
     </QueryProvider>
   );
 }

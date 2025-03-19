@@ -30,6 +30,8 @@ export async function findUserByOAuthId(oauthId: string) {
     .select('*')
     .eq('oauth_id', oauthId)
     .single();
+
+    console.log('FIND OAUTHHHH ',data)
     
   if (error) {
     if (error.code !== 'PGRST116') { // 'PGRST116' is Postgres' "no rows returned" error
@@ -47,73 +49,47 @@ export async function syncUserWithSupabase(userData: {
   name: string;
   email: string;
   image: string;
-  provider?: string;
-  providerAccountId?: string;
 }) {
   try {
     const supabase = getSafeSupabaseClient();
     if (!supabase) return null;
-    
-    // Store the original OAuth ID
-    const oauthId = userData.id;
-    
-    // First, check if a profile already exists with this OAuth ID
-    const { data: existingProfile, error: profileLookupError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('oauth_id', oauthId)
-      .single();
-    
-    if (existingProfile) {
-      console.log(`[SUPABASE] Found existing profile with OAuth ID ${oauthId}, using UUID: ${existingProfile.id}`);
-      
-      // Update the existing profile
-      const { data: updatedProfile, error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          name: userData.name,
-          email: userData.email,
-          avatar_url: userData.image,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingProfile.id)
-        .select()
-        .single();
-      
-      if (updateError) {
-        console.error(`[SUPABASE] Error updating profile: ${updateError.message}`);
-        return existingProfile;
+
+    // 1. First get or create auth user
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email: userData.email,
+      email_confirm: true,
+      user_metadata: {
+        full_name: userData.name,
+        avatar_url: userData.image
       }
-      
-      return updatedProfile;
+    });
+
+    if (authError || !authUser?.user) {
+      throw new Error(`Auth creation failed: ${authError?.message || 'Unknown error'}`);
     }
-    
-    // No existing profile found, create a new one with a proper UUID
-    const newUuid = uuidv4(); // Generate a proper UUID
-    console.log(`[SUPABASE] Generated new UUID for OAuth ID ${oauthId}: ${newUuid}`);
-    
-    // Create new profile first
-    const { data: newProfile, error: insertError } = await supabase
+
+    // 2. Now create profile with proper UUID from auth system
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .insert({
-        id: newUuid, // Use the generated UUID
-        oauth_id: oauthId, // Store the original OAuth ID
-        name: userData.name,
+      .upsert({
+        id: uuidv4(),  // Use the UUID from auth system
+        oauth_id: userData.id, // Store original OAuth ID here
+        full_name: userData.name,
         email: userData.email,
         avatar_url: userData.image,
         subscription_tier: 'free',
-        story_credits: 3,
-        voice_credits: 3
+        story_credits: 1,
+        voice_credits: 1
       })
       .select()
       .single();
-    
-    if (insertError) {
-      console.error(`[SUPABASE] Error creating profile: ${insertError.message}`);
+
+    if (profileError) {
+      console.error(`[SUPABASE] Error creating profile: ${profileError.message}`);
       return null;
     }
     
-    console.log(`[SUPABASE] Created new profile with ID: ${newProfile.id} for OAuth ID: ${oauthId}`);
+    console.log(`[SUPABASE] Created new profile with ID: ${profile.id} for OAuth ID: ${userData.id}`);
     
     // For auth.users, use the proper auth API instead of direct table access
     if (userData.email) {
@@ -141,8 +117,7 @@ export async function syncUserWithSupabase(userData: {
             user_metadata: {
               full_name: userData.name,
               avatar_url: userData.image,
-              oauth_id: oauthId,
-              provider: userData.provider
+              oauth_id: userData.id
             }
           });
           
@@ -159,9 +134,9 @@ export async function syncUserWithSupabase(userData: {
       }
     }
     
-    return newProfile;
+    return profile;
   } catch (error) {
-    console.error('[SUPABASE] Unexpected error in syncUserWithSupabase:', error);
-    return null;
+    console.error('[SUPABASE] Error syncing user:', error);
+    throw error;
   }
 }

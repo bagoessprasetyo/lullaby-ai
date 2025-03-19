@@ -1,4 +1,6 @@
 // app/actions/subscriptions.ts
+// Updated getSubscriptionFeatures to limit free tier to one story
+
 "use server";
 
 import { getAdminClient } from '@/lib/supabase';
@@ -18,36 +20,53 @@ export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | 
     
     // Use the admin client since we're on the server
     const client = getAdminClient();
+    console.log('FEATURE USER ID ',session.user.id)
     
     // Query user profile from Supabase
-    const { data, error } = await client
+    const { data: profileData, error: profileError } = await client
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
       .single();
     
-    if (error) {
-      console.error("Database query error:", error);
-      throw error;
+    if (profileError) {
+      console.error("Database query error:", profileError);
+      throw profileError;
     }
     
-    if (!data) {
+    if (!profileData) {
       console.log("No profile found for user ID:", session.user.id);
       return null;
     }
     
     // Get subscription tier from the database
-    const subscription_tier = data.subscription_tier || 'free';
+    const subscription_tier = profileData.subscription_tier || 'free';
+    
+    // Check if this is the user's first story (for free tier)
+    const { data: storyCount, error: storyError } = await client
+      .from('stories')
+      .select('count', { count: 'exact', head: true })
+      .eq('user_id', session.user.id);
+      
+    if (storyError) {
+      console.error("Error counting user stories:", storyError);
+    }
+    
+    // Free tier gets one free story, after that they need to upgrade
+    const hasUsedFreeStory = (Array.isArray(storyCount) ? storyCount[0]?.count || 0 : storyCount || 0) >= 1;
+    const storyLimit = subscription_tier === 'free' 
+      ? (hasUsedFreeStory ? 0 : 1) // If they've already created a story, limit is 0
+      : subscription_tier === 'premium' ? 30
+      : subscription_tier === 'premium_plus' ? 100 
+      : 1; // Fallback to 1
     
     // Define features based on subscription tier
     const features: SubscriptionFeatures = {
       success: true,
       subscription_tier,
       features: {
-        // Implement the new limits based on tier
-        story_limit: subscription_tier === 'free' ? 5 : 
-                    subscription_tier === 'premium' ? 30 : 
-                    subscription_tier === 'premium_plus' ? 100 : 5,
+        // Updated limits based on tier
+        story_limit: storyLimit,
         
         long_stories: subscription_tier !== 'free',
         

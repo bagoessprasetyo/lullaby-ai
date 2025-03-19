@@ -1,254 +1,244 @@
+// components/pricing/pricing-section.tsx
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Check, X, Sparkles, Users, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { CheckCircle2, Crown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-
+import { useSubscription } from "@/hooks/useSubscription";
+import { createCheckoutAction } from "@/app/actions/subscription-actions";
 import { useSession } from "next-auth/react";
-import { AuthModal } from "@/components/auth/auth-modal";
-import { useUpgradeModal } from "@/hooks/useUpgradeModal";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export function PricingSection() {
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const { data: session } = useSession();
-  const [isAnnual, setIsAnnual] = useState(true);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const { openModal } = useUpgradeModal();
+  const { features, isSubscriber } = useSubscription();
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
-  // Define pricing plans
-  const plans = [
-    {
-      id: "free",
-      name: "Free",
-      description: "Basic features for bedtime story creation",
-      price: {
-        monthly: 0,
-        annually: 0,
-      },
-      features: [
-        { name: "5 AI-generated stories per month", included: true },
-        { name: "Short & medium story lengths", included: true },
-        { name: "Basic AI voices", included: true },
-        { name: "Standard image analysis", included: true },
-        { name: "Store up to 10 stories", included: true },
-        { name: "Background music", included: false },
-        { name: "Custom voice profiles", included: false },
-        { name: "Ad-free experience", included: false },
-        { name: "Long stories (5+ minutes)", included: false },
-      ],
-      cta: "Get Started",
-      highlight: false,
-      icon: <Home className="h-5 w-5" />,
-    },
-    {
-      id: "premium",
-      name: "Premium",
-      description: "Enhanced features for the perfect bedtime experience",
-      price: {
-        monthly: 7.99,
-        annually: 6.99,
-      },
-      features: [
-        { name: "Unlimited AI-generated stories", included: true },
-        { name: "All story lengths (including long)", included: true },
-        { name: "Premium AI voices", included: true },
-        { name: "Advanced image analysis", included: true },
-        { name: "Unlimited story storage", included: true },
-        { name: "Background music", included: true },
-        { name: "3 custom voice profiles", included: true },
-        { name: "Ad-free experience", included: true },
-        { name: "Priority support", included: true },
-      ],
-      cta: "Upgrade to Premium",
-      highlight: true,
-      badge: "Most Popular",
-      icon: <Sparkles className="h-5 w-5" />,
-    },
-    {
-      id: "family",
-      name: "Family",
-      description: "Perfect for families with multiple children",
-      price: {
-        monthly: 14.99,
-        annually: 12.99,
-      },
-      features: [
-        { name: "Everything in Premium", included: true },
-        { name: "Up to 10 custom voice profiles", included: true },
-        { name: "Family sharing (up to 5 members)", included: true },
-        { name: "Advanced customization options", included: true },
-        { name: "Educational story templates", included: true },
-        { name: "Custom character creation", included: true },
-        { name: "Story series & collections", included: true },
-        { name: "Exclusive story themes", included: true },
-        { name: "Premium support", included: true },
-      ],
-      cta: "Get Family Plan",
-      highlight: false,
-      icon: <Users className="h-5 w-5" />,
-    },
-  ];
+  const handleSubscribe = async (plan: 'premium' | 'premium_plus') => {
+    if (!session) {
+      toast.error("Please sign in to subscribe");
+      return;
+    }
 
-  const handlePlanSelection = (planId: string) => {
-    if (session) {
-      if (planId !== "free") {
-        openModal();
+    setIsLoading(true);
+    try {
+      const result = await createCheckoutAction(plan, billingPeriod);
+      if (result.success && result.url) {
+        router.push(result.url);
+      } else {
+        throw new Error("Failed to create checkout");
       }
-    } else {
-      setIsAuthModalOpen(true);
+    } catch (error) {
+      console.error("Error creating checkout:", error);
+      toast.error("Failed to create checkout. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <section id="pricing" className="py-24 bg-black">
-      <div className="container max-w-7xl mx-auto px-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-4xl font-bold text-white mb-4">
+    <section className="py-16 px-4 md:py-24 bg-gradient-to-b from-gray-950 to-gray-900" id="pricing">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Simple, Transparent Pricing
           </h2>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-8">
-            Choose the perfect plan for your bedtime story needs.
-            Upgrade anytime as your family's needs grow.
+          <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+            Choose the plan that works best for you and your family
           </p>
-
+          
           {/* Billing toggle */}
-          <div className="flex items-center justify-center space-x-4 mb-6">
-            <span className={`text-sm ${!isAnnual ? "text-white font-medium" : "text-gray-400"}`}>
+          <div className="mt-8 inline-flex items-center bg-gray-900 p-1 rounded-lg border border-gray-800">
+            <button
+              onClick={() => setBillingPeriod("monthly")}
+              className={cn(
+                "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                billingPeriod === "monthly"
+                  ? "bg-indigo-600 text-white"
+                  : "text-gray-400 hover:text-white"
+              )}
+            >
               Monthly
-            </span>
-            <div className="flex items-center">
-              <Switch 
-                checked={isAnnual} 
-                onCheckedChange={setIsAnnual}
-              />
-            </div>
-            <div className="flex items-center">
-              <span className={`text-sm ${isAnnual ? "text-white font-medium" : "text-gray-400"}`}>
-                Annual
+            </button>
+            <button
+              onClick={() => setBillingPeriod("annual")}
+              className={cn(
+                "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                billingPeriod === "annual"
+                  ? "bg-indigo-600 text-white"
+                  : "text-gray-400 hover:text-white"
+              )}
+            >
+              Annual
+              <span className="ml-1 text-xs bg-green-600 text-white px-1.5 py-0.5 rounded-full">
+                Save 17%
               </span>
-              <Badge className="bg-green-900/80 text-green-300 ml-2">
-                Save 20%
-              </Badge>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Free Tier */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="p-6 border-b border-gray-800">
+              <h3 className="text-xl font-semibold text-white mb-1">Free</h3>
+              <p className="text-gray-400 text-sm mb-4">Get started with one story</p>
+              <div className="flex items-baseline">
+                <span className="text-3xl font-bold text-white">$0</span>
+                <span className="text-gray-500 ml-1">/forever</span>
+              </div>
+            </div>
+            <div className="p-6">
+              <ul className="space-y-3">
+                <Feature included>
+                  <span className="font-medium">1 story generation</span>
+                  <span className="block text-xs text-gray-500 mt-1">Try before you subscribe</span>
+                </Feature>
+                <Feature included>3 images per story</Feature>
+                <Feature included>Basic theme options</Feature>
+                <Feature included={false}>Long stories</Feature>
+                <Feature included={false}>Background music</Feature>
+                <Feature included={false}>Custom voices</Feature>
+                <Feature included={false}>Custom characters</Feature>
+                <Feature included={false}>Educational themes</Feature>
+              </ul>
+              <Button 
+                className="w-full mt-6 bg-gray-800 hover:bg-gray-700 text-white" 
+                onClick={() => router.push("/dashboard/create")}
+              >
+                Get Started
+              </Button>
             </div>
           </div>
-        </motion.div>
 
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {plans.map((plan, index) => (
-            <motion.div
-              key={plan.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 * index }}
-              viewport={{ once: true }}
-            >
-              <div 
-                className={cn(
-                  "h-full flex flex-col relative overflow-hidden rounded-xl border-gray-800 bg-gray-900",
-                  plan.highlight && "border-indigo-500/50 bg-gradient-to-b from-gray-900 to-indigo-900/20"
-                )}
-              >
-                {plan.badge && (
-                  <div className="absolute top-0 right-0">
-                    <Badge className="bg-indigo-500 text-white rounded-tl-none rounded-br-none text-xs px-3 py-1">
-                      {plan.badge}
-                    </Badge>
-                  </div>
-                )}
-
-                <div className="p-6">
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className={cn(
-                      "p-2 rounded-full",
-                      plan.highlight ? "bg-indigo-900/50 text-indigo-300" : "bg-gray-800 text-gray-400"
-                    )}>
-                      {plan.icon}
-                    </div>
-                    <h3 className="text-xl font-semibold text-white">{plan.name}</h3>
-                  </div>
-                  <p className="text-gray-400 mb-4">
-                    {plan.description}
-                  </p>
-
-                  <div className="mb-4">
-                    <div className="flex items-baseline">
-                      <span className="text-4xl font-bold text-white">
-                        ${isAnnual ? plan.price.annually : plan.price.monthly}
-                      </span>
-                      {plan.price.monthly > 0 && (
-                        <span className="text-gray-400 ml-2">
-                          / month
-                        </span>
-                      )}
-                    </div>
-                    {plan.price.monthly > 0 && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        {isAnnual 
-                          ? `Billed annually (${plan.price.annually * 12}/year)` 
-                          : "Billed monthly"}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex-grow mb-6">
-                    <ul className="space-y-3 text-sm">
-                      {plan.features.map((feature, i) => (
-                        <li 
-                          key={i} 
-                          className="flex items-start"
-                        >
-                          <div className="mr-3 mt-0.5">
-                            {feature.included ? (
-                              <Check className="h-5 w-5 text-green-400" />
-                            ) : (
-                              <X className="h-5 w-5 text-gray-600" />
-                            )}
-                          </div>
-                          <span className={feature.included ? "text-gray-300" : "text-gray-500"}>
-                            {feature.name}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <Button 
-                    className={cn(
-                      "w-full",
-                      plan.highlight 
-                        ? "bg-indigo-600 hover:bg-indigo-700 text-white" 
-                        : "bg-gray-800 text-white hover:bg-gray-700"
-                    )}
-                    onClick={() => handlePlanSelection(plan.id)}
-                  >
-                    {plan.cta}
-                  </Button>
-                </div>
+          {/* Premium Tier */}
+          <div className="bg-gradient-to-b from-indigo-900/40 to-gray-900 border border-indigo-800 rounded-xl overflow-hidden shadow-xl transform md:scale-105 relative">
+            <div className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-medium px-3 py-1 rounded-bl-lg">
+              Popular
+            </div>
+            <div className="p-6 border-b border-indigo-800/50">
+              <h3 className="text-xl font-semibold text-white mb-1">Premium</h3>
+              <p className="text-indigo-300 text-sm mb-4">Everything you need</p>
+              <div className="flex items-baseline">
+                <span className="text-3xl font-bold text-white">
+                  {billingPeriod === "monthly" ? "$9.99" : "$99.99"}
+                </span>
+                <span className="text-indigo-400 ml-1">
+                  /{billingPeriod === "monthly" ? "month" : "year"}
+                </span>
               </div>
-            </motion.div>
-          ))}
-        </div>
+            </div>
+            <div className="p-6">
+              <ul className="space-y-3">
+                <Feature included>
+                  <span className="font-medium">30 stories per month</span>
+                  <span className="block text-xs text-indigo-400 mt-1">Great for regular use</span>
+                </Feature>
+                <Feature included>5 images per story</Feature>
+                <Feature included>All basic themes</Feature>
+                <Feature included>Long stories</Feature>
+                <Feature included>Background music</Feature>
+                <Feature included>2 custom voices</Feature>
+                <Feature included={false}>Custom characters</Feature>
+                <Feature included={false}>Educational themes</Feature>
+              </ul>
+              <Button 
+                className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white" 
+                onClick={() => handleSubscribe("premium")}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="animate-spin mr-2">⟳</span>Processing...
+                  </>
+                ) : (
+                  <>
+                    <Crown className="mr-2 h-4 w-4" />
+                    Subscribe
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
 
-        {/* Testimonials Section (optional) */}
-        <div className="mt-24">
-          {/* testimonials content here */}
+          {/* Premium+ Tier */}
+          <div className="bg-gradient-to-b from-purple-900/40 to-gray-900 border border-purple-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="p-6 border-b border-purple-800/50">
+              <h3 className="text-xl font-semibold text-white mb-1">Premium+</h3>
+              <p className="text-purple-300 text-sm mb-4">For power users</p>
+              <div className="flex items-baseline">
+                <span className="text-3xl font-bold text-white">
+                  {billingPeriod === "monthly" ? "$14.99" : "$149.99"}
+                </span>
+                <span className="text-purple-400 ml-1">
+                  /{billingPeriod === "monthly" ? "month" : "year"}
+                </span>
+              </div>
+            </div>
+            <div className="p-6">
+              <ul className="space-y-3">
+                <Feature included>
+                  <span className="font-medium">100 stories per month</span>
+                  <span className="block text-xs text-purple-400 mt-1">Ultimate flexibility</span>
+                </Feature>
+                <Feature included>5 images per story</Feature>
+                <Feature included>All themes including exclusive</Feature>
+                <Feature included>Extra long stories</Feature>
+                <Feature included>Advanced background music mixing</Feature>
+                <Feature included>5 custom voices</Feature>
+                <Feature included>Custom characters</Feature>
+                <Feature included>Educational themes</Feature>
+              </ul>
+              <Button 
+                className="w-full mt-6 bg-purple-600 hover:bg-purple-700 text-white" 
+                onClick={() => handleSubscribe("premium_plus")}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="animate-spin mr-2">⟳</span>Processing...
+                  </>
+                ) : (
+                  <>
+                    <Crown className="mr-2 h-4 w-4" />
+                    Subscribe
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+        
+        <div className="text-center mt-12 text-gray-400 text-sm">
+          <p>
+            All plans include secure payment processing. Cancel anytime.
+          </p>
         </div>
       </div>
-      
-      <AuthModal 
-        isOpen={isAuthModalOpen}
-        onOpenChange={setIsAuthModalOpen}
-      />
     </section>
+  );
+}
+
+interface FeatureProps {
+  included: boolean;
+  children: React.ReactNode;
+}
+
+function Feature({ included, children }: FeatureProps) {
+  return (
+    <li className="flex items-start">
+      {included ? (
+        <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mr-3 mt-0.5" />
+      ) : (
+        <X className="h-5 w-5 text-gray-500 shrink-0 mr-3 mt-0.5" />
+      )}
+      <span className={cn("text-sm", included ? "text-gray-300" : "text-gray-500")}>
+        {children}
+      </span>
+    </li>
   );
 }
