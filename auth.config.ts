@@ -91,51 +91,63 @@ export const authOptions: NextAuthOptions = {
       if (token && customSession.user) {
         // Add the user ID to the session (from OAuth provider)
         const oauthId = token.sub as string;
+        
+        // Start with basic user data
         customSession.user.id = oauthId;
-        console.log('tokeeennnn ', token)
-        console.log('oauthhhhh', oauthId)
+        customSession.user.oauthId = oauthId;
+        
+        console.log('[AUTH] Processing session for OAuth ID:', oauthId);
+        
         // Only sync if we have an ID and Supabase URL is configured
         if (oauthId && process.env.NEXT_PUBLIC_SUPABASE_URL) {
           try {
             // First, try to find by OAuth ID
             let profile = await findUserByOAuthId(oauthId);
+            console.log('[AUTH] Existing profile found by OAuth ID:', profile ? profile.id : 'None');
             
             if (profile) {
-              customSession.user.id = profile.id;
+              // We found an existing profile, update it
               profile = await syncUserWithSupabase({
-                id: profile.id,
+                id: oauthId, // This is the OAuth ID
                 name: token.name as string || '',
                 email: token.email as string || '',
-                image: token.image as string || ''
+                image: token.picture as string || ''
               });
             } else {
-              // If not found, sync the user with both auth and profiles tables
+              // No profile found, create a new one
+              console.log('[AUTH] Creating new profile for user:', token.email);
               profile = await syncUserWithSupabase({
-                id: oauthId,
+                id: oauthId, // This is the OAuth ID
                 name: token.name as string || '',
                 email: token.email as string || '',
-                image: token.image as string || ''
+                image: token.picture as string || ''
               });
             }
             
             if (profile) {
+              console.log('[AUTH] Profile synced successfully, ID:', profile.id);
+              
               // Add profile data to session
               customSession.user = {
                 ...customSession.user,
-                id: profile.id || '',        // Supabase UUID or fallback
-                oauthId: (token.oauthId as string) || (token.sub as string) || '',  // Explicit OAuth ID
-                name: token.name || '',
-                email: token.email || '',
-                image: token.picture || '',
-                subscriptionTier: (token.subscriptionTier as string) || 'free'
+                id: profile.id || oauthId,       // Supabase UUID or fallback to OAuth ID
+                oauthId: oauthId,                // Always keep the OAuth ID
+                name: token.name as string || '',
+                email: token.email as string || '',
+                image: token.picture as string || '',
+                subscriptionTier: profile.subscription_tier || 'free'
               };
+            } else {
+              console.warn('[AUTH] No profile returned after sync attempt');
             }
           } catch (error) {
-            console.error("[SUPABASE] Error syncing with Supabase:", error);
+            console.error("[AUTH] Error syncing with Supabase:", error);
           }
         } else {
-          console.warn("[SUPABASE] Skipping Supabase sync due to missing configuration");
+          console.warn("[AUTH] Skipping Supabase sync due to missing configuration");
         }
+      } else {
+        console.warn("[AUTH] Missing token or user data in session callback");
       }
       
       return customSession;
@@ -165,13 +177,15 @@ export const authOptions: NextAuthOptions = {
       }
     },
     sessionToken: {
-      name: `__Secure-next-auth.session-token`,
+      name: process.env.NODE_ENV === "production" 
+        ? `__Secure-next-auth.session-token`
+        : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: true,
-        domain: ".lullaby-ai.com"
+        secure: process.env.NODE_ENV === "production",
+        // Remove domain setting to allow it to work in any environment
       },
     },
   },

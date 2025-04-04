@@ -54,23 +54,42 @@ export async function syncUserWithSupabase(userData: {
     const supabase = getSafeSupabaseClient();
     if (!supabase) return null;
 
-    // 1. Check if user exists by oauth_id
-    const { data: existingProfile, error: lookupError } = await supabase
+    console.log(`[SUPABASE] Syncing user with OAuth ID: ${userData.id}`);
+
+    // 1. First, check if user exists by oauth_id
+    const { data: existingByOAuthId, error: oauthLookupError } = await supabase
       .from('profiles')
-      .select('id')
-      .eq('id', userData.id)
+      .select('*')
+      .eq('oauth_id', userData.id)
       .maybeSingle();
 
-    if (lookupError) {
-      console.error('[SUPABASE] Profile lookup error:', lookupError);
-      return null;
+    if (oauthLookupError && oauthLookupError.code !== 'PGRST116') {
+      console.error('[SUPABASE] OAuth ID lookup error:', oauthLookupError);
+    }
+
+    // 2. If not found by oauth_id, check by email as a fallback (for handling migrations or duplicates)
+    let existingProfile = existingByOAuthId;
+    if (!existingProfile && userData.email) {
+      const { data: existingByEmail, error: emailLookupError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', userData.email)
+        .maybeSingle();
+
+      if (emailLookupError && emailLookupError.code !== 'PGRST116') {
+        console.error('[SUPABASE] Email lookup error:', emailLookupError);
+      }
+      
+      existingProfile = existingByEmail;
     }
 
     const now = new Date().toISOString();
     
-    // 2. Update existing profile or create new one
+    // 3. Update existing profile or create new one
     let profile;
     if (existingProfile) {
+      console.log(`[SUPABASE] Found existing profile with ID: ${existingProfile.id}`);
+      
       // Update existing profile
       const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
@@ -78,6 +97,7 @@ export async function syncUserWithSupabase(userData: {
           name: userData.name,
           email: userData.email,
           avatar_url: userData.image,
+          oauth_id: userData.id, // Ensure oauth_id is always set
           last_login_at: now,
           updated_at: now
         })
@@ -85,14 +105,22 @@ export async function syncUserWithSupabase(userData: {
         .select()
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('[SUPABASE] Profile update error:', updateError);
+        throw updateError;
+      }
+      
       profile = updatedProfile;
+      console.log(`[SUPABASE] Updated profile for user: ${profile.id}`);
     } else {
-      // Create new profile
+      // Create new profile with a new UUID
+      const newId = uuidv4();
+      console.log(`[SUPABASE] Creating new profile with ID: ${newId}, OAuth ID: ${userData.id}`);
+      
       const { data: newProfile, error: insertError } = await supabase
         .from('profiles')
         .insert({
-          id: uuidv4(),
+          id: newId,
           oauth_id: userData.id,
           name: userData.name,
           email: userData.email,
@@ -100,16 +128,21 @@ export async function syncUserWithSupabase(userData: {
           subscription_tier: 'free',
           subscription_status: 'active',
           last_login_at: now,
+          created_at: now,
           updated_at: now
         })
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('[SUPABASE] Profile creation error:', insertError);
+        throw insertError;
+      }
+      
       profile = newProfile;
+      console.log(`[SUPABASE] Created new profile with ID: ${profile.id}`);
     }
 
-    console.log(`[SUPABASE] ${existingProfile ? 'Updated' : 'Created'} profile for OAuth ID: ${userData.id}`);
     return profile;
     
   } catch (error) {

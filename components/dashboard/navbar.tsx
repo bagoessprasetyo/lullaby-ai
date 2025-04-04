@@ -248,7 +248,24 @@ export function DashboardNavbar() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer text-red-500 focus:text-red-500"
-                  onClick={() => signOut({ callbackUrl: "/" })}
+                  onClick={async () => {
+                    try {
+                      // Clear any local storage
+                      localStorage.removeItem("supabase.auth.token");
+                      
+                      // Clear cookies
+                      document.cookie.split(";").forEach(function(c) {
+                        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                      });
+                      
+                      // Sign out with NextAuth
+                      await signOut({ callbackUrl: "/" });
+                    } catch (error) {
+                      console.error("Error during sign out:", error);
+                      // Fallback to basic signout
+                      signOut({ callbackUrl: "/" });
+                    }
+                  }}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>

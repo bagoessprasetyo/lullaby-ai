@@ -10,7 +10,7 @@ export default withAuth(
     console.log(`[MIDDLEWARE] Request to ${req.nextUrl.pathname}`, {
       isAuthenticated,
       isProtectedRoute,
-      headers: Object.fromEntries([...req.headers])
+      token: req.nextauth?.token ? "Token exists" : "No token"
     });
     
     // If authenticated and accessing protected route, allow access

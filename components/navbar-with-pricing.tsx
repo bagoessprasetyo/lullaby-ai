@@ -172,9 +172,24 @@ export function Navbar() {
                   
                   {status === "authenticated" ? (
                     <button
-                      onClick={() => {
-                        setIsMobileNavOpen(false);
-                        signOut({ callbackUrl: "/" });
+                      onClick={async () => {
+                        try {
+                          setIsMobileNavOpen(false);
+                          // Clear any local storage
+                          localStorage.removeItem("supabase.auth.token");
+                          
+                          // Clear cookies
+                          document.cookie.split(";").forEach(function(c) {
+                            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                          });
+                          
+                          // Sign out with NextAuth
+                          await signOut({ callbackUrl: "/" });
+                        } catch (error) {
+                          console.error("Error during sign out:", error);
+                          // Fallback to basic signout
+                          signOut({ callbackUrl: "/" });
+                        }
                       }}
                       className="flex items-center gap-2 px-3 py-2 text-lg rounded-lg transition-colors hover:bg-red-900/20 text-red-500"
                     >
