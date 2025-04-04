@@ -1,10 +1,7 @@
 {
   "functions": {
-    "app/api/stories/generate/webhook/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/stories/generate/init/route.ts": {
-      "maxDuration": 60
+    "app/api/stories/generate/route.ts": {
+      "maxDuration": 200
     }
   }
 }
