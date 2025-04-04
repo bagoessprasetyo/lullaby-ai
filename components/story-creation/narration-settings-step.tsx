@@ -42,6 +42,7 @@ interface VoiceLabel {
   accent?: string;
   description?: string;
   use_case?: string;
+  language?: string;
 }
 
 interface Voice {
@@ -152,16 +153,22 @@ export function NarrationSettingsStep({
           }
           
           // Base filter for appropriate voices
-          const baseFilter = voice.category === 'professional' || 
+          const baseFilter = voice.category === 'professional' || voice.category === 'cloned' || 
                  (voice.labels && (
                    voice.labels.accent === 'American' || 
                    voice.labels.description === 'storyteller' ||
                    voice.labels.use_case === 'storytelling'
                  ));
+
+            const baseFilterIdn = voice.labels && (
+              voice.labels.language === 'id'
+            );
                  
           // Don't apply language filter for English as most voices are in English
           if (formData.language === "english") {
             return baseFilter;
+          }else{
+            return baseFilterIdn;
           }
 
           const currentLanguageCode = formData.language === 'indonesian' ? 'id' : 'en';
