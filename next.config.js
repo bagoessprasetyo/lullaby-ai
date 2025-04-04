@@ -27,7 +27,6 @@ const nextConfig = {
     unstable_includeFiles: {
       include: [],
       exclude: [
-        '**/api/stories/generate/webhook/**/*', 
         '**/api/stories/generate/**/*'
       ]
     }
