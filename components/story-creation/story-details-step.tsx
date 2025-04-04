@@ -231,10 +231,13 @@ export function StoryDetailsStep({
                 value="medium" 
                 id="duration-medium" 
                 className="peer sr-only"
+                disabled={!isSubscriber}
               />
               <Label
                 htmlFor="duration-medium"
-                className="flex items-start p-3 rounded-md border-2 border-gray-800 bg-gray-800/50 hover:bg-gray-800 hover:text-white peer-data-[state=checked]:border-indigo-500 peer-data-[state=checked]:bg-indigo-900/20 peer-data-[state=checked]:text-indigo-300 cursor-pointer transition-all"
+                className={cn("flex items-start p-3 rounded-md border-2 border-gray-800 bg-gray-800/50 hover:bg-gray-800 hover:text-white peer-data-[state=checked]:border-indigo-500 peer-data-[state=checked]:bg-indigo-900/20 peer-data-[state=checked]:text-indigo-300 cursor-pointer transition-all",
+                  !isSubscriber ? "opacity-75 cursor-not-allowed" : "cursor-pointer"
+                )}
               >
                 <div className="bg-indigo-900/40 rounded-full p-2 mr-3">
                   <Timer className="h-4 w-4 text-indigo-400" />
@@ -242,10 +245,19 @@ export function StoryDetailsStep({
                 
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-base">Medium Story</h4>
-                    <Badge className="bg-indigo-900/50 text-indigo-300 hover:bg-indigo-900/50">
-                      3 mins
-                    </Badge>
+                    <h4 className="font-medium text-base">
+                      Medium Story
+                      {!isSubscriber && " (Premium)"}
+                    </h4>
+                    <div className="flex gap-1 items-center">
+                      {!isSubscriber && (
+                          <Lock className="h-3 w-3 text-amber-400" />
+                        )}
+                      <Badge className="bg-indigo-900/50 text-indigo-300 hover:bg-indigo-900/50">
+                        3 mins
+                      </Badge>
+                    </div>
+                    
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
                     Balanced story with more details and development
