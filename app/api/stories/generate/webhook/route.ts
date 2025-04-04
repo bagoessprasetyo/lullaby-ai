@@ -11,7 +11,8 @@ import { uploadBase64Image, uploadAudioToCloudinary, configureCloudinary } from 
 import { mixAudioWithBackgroundMusic } from '@/lib/services/audio-mixer-service';
 
 // Set maximum duration for this function
-export const maxDuration = 300; // 5 minutes
+// Update this line at the top of your file
+export const maxDuration = 60; // 60 seconds for Vercel Hobby plan
 export const dynamic = 'force-dynamic';
 
 // Update the webhook handler to use Next.js App Router format

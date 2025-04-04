@@ -30,6 +30,9 @@ const nextConfig = {
         '**/api/stories/generate/**/*'
       ]
     }
+  },
+  serverlessFunctionConfig: {
+    maxDuration: 60 // Set maximum duration to 60 seconds for Vercel Hobby plan
   }
 };
 
