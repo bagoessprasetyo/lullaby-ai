@@ -14,7 +14,7 @@ import { PlayHistoryEntry } from "@/lib/services/history-service";
 import { trackDashboardInteraction } from "@/lib/services/usage-tracking-service";
 
 // Import custom components
-import { QuickActions } from "./quick-actions";
+import { Suspense } from 'react';
 import { ListeningInsights } from "./listening-insights";
 import { StoryCategorization } from "./story-categorization";
 import { StoryRecommendations } from "./story-recommendations";
@@ -22,6 +22,7 @@ import { MilestoneTracker } from "./milestone-tracker";
 import { WelcomeBack } from "./welcome-back";
 import { MobileDashboard } from "./mobile-dashboard";
 import { EnhancedSearchBar } from "./enhanced-search";
+import { ListeningInsightsSkeleton } from './listening-insights-skeleton';
 import { historyEntriesToStories } from "@/lib/utils/story-utils";
 
 // Define interface for component props
@@ -378,19 +379,21 @@ export function FinalDashboard({
                 onRefresh={refreshDashboardData}
               />
               
-              {/* Listening Insights */}
-              <ListeningInsights
-                stats={listeningStats}
-                streak={streakData}
-                listeningPatterns={listeningPatterns}
-                isLoading={isLoadingInsights}
-                onRefresh={refreshDashboardData}
-                timeRange={insightsTimeRange}
-                onTimeRangeChange={handleTimeRangeChange}
-              />
+              {/* Listening Insights with Suspense */}
+              <Suspense fallback={<ListeningInsightsSkeleton />}>
+                <ListeningInsights
+                  stats={listeningStats}
+                  streak={streakData}
+                  listeningPatterns={listeningPatterns}
+                  isLoading={isLoadingInsights}
+                  onRefresh={refreshDashboardData}
+                  timeRange={insightsTimeRange}
+                  onTimeRangeChange={handleTimeRangeChange}
+                />
+              </Suspense>
               
               {/* Milestone Tracker */}
-              <MilestoneTracker
+              {/* <MilestoneTracker
                 userId={initialUserPreferences?.id || 'anonymous'}
                 isLoading={isLoadingInsights}
                 initialMilestones={{
@@ -409,7 +412,7 @@ export function FinalDashboard({
                              listeningStats.totalPlays / 100
                   }
                 }}
-              />
+              /> */}
             </div>
           </div>
 

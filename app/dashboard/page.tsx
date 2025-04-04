@@ -82,20 +82,15 @@ export default async function DashboardPage() {
   let userPreferences = {};
   
   try {
+    // First fetch critical data for initial render
     [
       recentStories, 
       storyCount, 
       subscriptionFeatures,
-      favoriteStories,
-      playHistory,
-      listeningStats,
-      streakData,
-      listeningPatterns,
-      userPreferences
+      favoriteStories
     ] = await Promise.all([
       getRecentStories(session.user.id, 5),
       getStoryCount(session.user.id),
-      // Update the subscription features promise chain
       getSubscriptionFeatures()
         .catch(error => {
           console.error(`Dashboard: Error fetching subscription features: ${error}`);
@@ -123,12 +118,22 @@ export default async function DashboardPage() {
       }).catch(error => {
         console.error(`Dashboard: Error fetching favorite stories: ${error}`);
         return [];
-      }),
+      })
+    ]);
+    
+    // Then fetch secondary metrics in parallel after initial render
+    [
+      playHistory,
+      listeningStats,
+      streakData,
+      listeningPatterns,
+      // userPreferences
+    ] = await Promise.all([
       getPlayHistory(session.user.id, { timeRange: '30days', limit: 5 }),
       getListeningStats(session.user.id),
       getUserStreak(session.user.id),
       getListeningPatterns(session.user.id),
-      getUserPreferences(session.user.id).catch(() => ({})) // Fallback to empty object if not found
+      // getUserPreferences(session.user.id).catch(() => ({}))
     ]);
   } catch (error) {
     console.error(`Dashboard: Error fetching data: ${error}`);
@@ -147,7 +152,7 @@ export default async function DashboardPage() {
           initialListeningStats={listeningStats}
           initialStreakData={streakData}
           initialListeningPatterns={listeningPatterns}
-          initialUserPreferences={userPreferences}
+          // initialUserPreferences={userPreferences}
         />
       </Suspense>
     </QueryProvider>

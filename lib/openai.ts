@@ -149,7 +149,7 @@ export async function analyzeImageWithOpenAI(imageUrl: string): Promise<any> {
             content: [
               {
                 type: "text",
-                text: "Describe this image for a children's bedtime story. Identify main subjects, setting, mood, and notable details. Format response as JSON with these fields: subjects (array of strings), setting (string), themes (array of strings), mood (string), details (array of strings), raw (string with full description)."
+                text: "Describe this image for a bedtime story. Identify main subjects, setting, mood, and notable details. Format response as JSON with these fields: subjects (array of strings), setting (string), themes (array of strings), mood (string), details (array of strings), raw (string with full description)."
               },
               {
                 type: "image_url",

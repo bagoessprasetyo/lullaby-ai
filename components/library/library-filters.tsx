@@ -78,12 +78,17 @@ export function LibraryFilters({
   // Debounced search value for automatic search
   const debouncedSearch = useDebounce(search, 500);
   
-  // Update URL with new search params
+  // Update URL with new search params - improved version
   const updateSearchParams = (params: Record<string, string | null>) => {
     setIsSearching(true);
     
+    // Create a new URL object to work with
     const url = new URL(window.location.href);
     
+    // Track if we're clearing the search
+    const isClearingSearch = params.q === null && searchQuery !== '';
+    
+    // Update URL parameters
     Object.entries(params).forEach(([key, value]) => {
       if (value === null) {
         url.searchParams.delete(key);
@@ -92,59 +97,160 @@ export function LibraryFilters({
       }
     });
     
+    // Use startTransition to avoid UI jank
     startTransition(() => {
-      router.push(url.pathname + url.search);
-      setTimeout(() => setIsSearching(false), 300); // A slight delay to avoid UI flicker
+      // Use replace instead of push for smoother experience when clearing
+      if (isClearingSearch) {
+        // Force a hard navigation when clearing search to ensure data refresh
+        window.location.href = `${pathname}?${url.searchParams.toString()}`;
+        return;
+      } else {
+        router.push(`${pathname}?${url.searchParams.toString()}`, { scroll: false });
+      }
+      
+      // Delay turning off the loading state to ensure the UI has time to update
+      setTimeout(() => setIsSearching(false), 500);
     });
   };
   
+  // Handle search query change - improved version
+  // const handleSearch = (e?: React.FormEvent) => {
+  //   if (e) {
+  //     e.preventDefault();
+  //   }
+    
+  //   // Cancel any pending search operations
+  //   setIsSearching(true);
+    
+  //   // Ensure search is triggered even when clearing the input
+  //   if (search.length === 0) {
+  //     updateSearchParams({ q: null });
+  //   } else {
+  //     updateSearchParams({ q: search });
+  //   }
+  // };
+
+  // Clear search - improved version
+  const handleClearSearch = () => {
+    // First update local state
+    setSearch('');
+    setIsSearching(true);
+    
+    // Create new URL with all current params except 'q'
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.delete('q');
+    
+    // Force a hard navigation to ensure data refresh
+    window.location.href = `${pathname}?${newParams.toString()}`;
+  };
+  
   // Handle tab change
-  const handleTabChange = (value: string) => {
-    updateSearchParams({ tab: value });
-  };
+  // const handleTabChange = (value: string) => {
+  //   updateSearchParams({ tab: value });
+  // };
   
-  // Handle view mode change
-  const handleViewModeChange = (mode: "grid" | "list") => {
-    updateSearchParams({ view: mode });
-  };
+  // // Handle view mode change
+  // const handleViewModeChange = (mode: "grid" | "list") => {
+  //   updateSearchParams({ view: mode });
+  // };
   
-  // Handle search query change
+  // Modify the handleSearch function to use the same approach as other filters
   const handleSearch = (e?: React.FormEvent) => {
     if (e) {
       e.preventDefault();
     }
-    updateSearchParams({ q: search.length > 0 ? search : null });
+    
+    // Cancel any pending search operations
+    setIsSearching(true);
+    
+    // Create new URL with updated search parameter
+    const newParams = new URLSearchParams(window.location.search);
+    
+    // Ensure search is triggered even when clearing the input
+    if (search.length === 0) {
+      newParams.delete('q');
+    } else {
+      newParams.set('q', search);
+    }
+    
+    // Force a hard navigation to ensure data refresh
+    window.location.href = `${pathname}?${newParams.toString()}`;
   };
-
-  // Clear search
-  const handleClearSearch = () => {
-    setSearch('');
-    updateSearchParams({ q: null });
-    // Focus the search input after clearing
-    setTimeout(() => searchInputRef.current?.focus(), 10);
-  };
+  
+  // Update the auto-search effect to be more conservative
+  useEffect(() => {
+    // Only trigger search if the debounced value is different from URL
+    // and has at least 2 characters (to avoid excessive searches)
+    if (debouncedSearch !== searchQuery && 
+        (debouncedSearch.length >= 2 || debouncedSearch.length === 0)) {
+      handleSearch();
+    }
+  }, [debouncedSearch, searchQuery]);
   
   // Handle sort change
   const handleSortChange = (value: string) => {
-    updateSearchParams({ sort: value });
+    setIsSearching(true);
+    // Create new URL with updated sort parameter
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.set('sort', value);
+    
+    // Force a hard navigation to ensure data refresh
+    window.location.href = `${pathname}?${newParams.toString()}`;
   };
   
   // Handle language filter change
   const handleLanguageChange = (value: string | null) => {
-    updateSearchParams({ language: value });
+    setIsSearching(true);
+    // Create new URL with updated language parameter
+    const newParams = new URLSearchParams(window.location.search);
+    if (value === null) {
+      newParams.delete('language');
+    } else {
+      newParams.set('language', value);
+    }
+    
+    // Force a hard navigation to ensure data refresh
+    window.location.href = `${pathname}?${newParams.toString()}`;
   };
   
-  // Update local search state if URL param changes
-  useEffect(() => {
-    setSearch(searchQuery);
-  }, [searchQuery]);
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    setIsSearching(true);
+    // Create new URL with updated tab parameter
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.set('tab', value);
+    
+    // Force a hard navigation to ensure data refresh
+    window.location.href = `${pathname}?${newParams.toString()}`;
+  };
   
-  // Auto-search when debounced search changes (only if non-empty)
+  // Handle view mode change
+  const handleViewModeChange = (mode: "grid" | "list") => {
+    setIsSearching(true);
+    // Create new URL with updated view parameter
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.set('view', mode);
+    
+    // Force a hard navigation to ensure data refresh
+    window.location.href = `${pathname}?${newParams.toString()}`;
+  };
+  
+  // Update local search state if URL param changes - improved version
   useEffect(() => {
-    if (debouncedSearch !== searchQuery && debouncedSearch.length > 0) {
+    // Only update if there's a mismatch to avoid loops
+    if (search !== searchQuery) {
+      setSearch(searchQuery || '');
+    }
+  }, [searchQuery, pathname]);
+  
+  // Auto-search when debounced search changes - improved version
+  useEffect(() => {
+    // Only trigger search if the debounced value is different from URL
+    // or we're explicitly clearing the search
+    if (debouncedSearch !== searchQuery || (search === '' && searchQuery)) {
       handleSearch();
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, searchQuery]);
   
   return (
     <div className="mb-8">

@@ -37,14 +37,14 @@ const THEME_DESCRIPTIONS = {
 // Duration configuration
 const DURATION_CONFIG = {
   short: { 
-    words: 300, 
-    description: "short and sweet (2-3 minutes)",
-    paragraphs: 5
+    words: 150, 
+    description: "short and sweet (1-2 minutes)",
+    paragraphs: 3
   },
   medium: { 
-    words: 600, 
-    description: "medium length (4-5 minutes)",
-    paragraphs: 8
+    words: 500, 
+    description: "medium length (3-4 minutes)",
+    paragraphs: 6
   },
   long: { 
     words: 900, 
@@ -126,7 +126,7 @@ export function buildEnhancedStoryPrompt({
   const durationConfig = DURATION_CONFIG[duration as keyof typeof DURATION_CONFIG] || DURATION_CONFIG.medium;
   
   // Build prompt
-  return `${languageConfig.prompt_prefix} bedtime story for children featuring these characters: ${names.join(', ')}
+  return `${languageConfig.prompt_prefix} bedtime story featuring these characters: ${names.join(', ')}
 
 ${characterDescriptions.length > 0 ? 'Character Details:\n' + characterDescriptions.join('\n') + '\n\n' : ''}
 Scenes to include:

@@ -66,6 +66,7 @@ const navItems = [
     name: "History",
     href: "/dashboard/history",
     icon: <History className="h-5 w-5" />,
+    tooltip: "View your listening history and statistics",
   },
 ];
 

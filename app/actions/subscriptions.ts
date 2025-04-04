@@ -7,6 +7,7 @@ import { getAdminClient } from '@/lib/supabase';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from "@/auth.config";
 import { SubscriptionFeatures } from '@/types/subscription';
+import { Redis } from '@upstash/redis';
 
 export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | null> {
   try {
@@ -18,9 +19,23 @@ export async function getSubscriptionFeatures(): Promise<SubscriptionFeatures | 
       return null;
     }
     
+    // Check Redis cache first
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL?.startsWith('https://')
+        ? process.env.UPSTASH_REDIS_REST_URL
+        : `https://${process.env.UPSTASH_REDIS_REST_URL}`,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    
+    const cacheKey = `subscription:features:${session.user.id}`;
+    const cachedData = await redis.get(cacheKey);
+    
+    if (cachedData) {
+      return JSON.parse(cachedData as string);
+    }
+    
     // Use the admin client since we're on the server
     const client = getAdminClient();
-    console.log('FEATURE USER ID ',session.user.id)
     
     // Query user profile from Supabase
     const { data: profileData, error: profileError } = await client
