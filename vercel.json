@@ -1,7 +1,7 @@
 {
   "functions": {
     "app/api/stories/generate/route.ts": {
-      "maxDuration": 200
+      "maxDuration": 60
     }
   }
 }
