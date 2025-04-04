@@ -3,7 +3,6 @@ import { Suspense } from 'react';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth.config";
 import { redirect } from "next/navigation";
-import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { getRecentStories, getStoryCount, getFavoriteStories } from "@/lib/services/story-service";
 import { getSubscriptionFeatures } from "@/app/actions/subscriptions";
