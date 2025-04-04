@@ -82,7 +82,7 @@ export default async function DashboardPage() {
   let userPreferences = {};
   
   try {
-    // First fetch critical data for initial render
+    
     [
       recentStories, 
       storyCount, 
