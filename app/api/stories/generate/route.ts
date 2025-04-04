@@ -131,6 +131,169 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    // Check if this is an audio-only request
+    if (body.audioOnly && body.storyId) {
+      console.log(`[API] Audio-only generation request for story ID: ${body.storyId}`);
+      
+      // Get the story from the database
+      const adminClient = getAdminClient();
+      const { data: story, error } = await adminClient
+        .from('stories')
+        .select(`
+          *,
+          background_music:background_music_id (
+            id,
+            name,
+            url,
+            duration
+          )
+        `)
+        .eq('id', body.storyId)
+        .eq('user_id', userId)
+        .single();
+      
+      if (error || !story) {
+        console.error('[API] Error fetching story for audio generation:', error);
+        return new NextResponse(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Story not found or access denied' 
+          }), 
+          { status: 404, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Generate audio and update the story
+      try {
+        // Call ElevenLabs API to generate audio
+        const apiKey = process.env.ELEVENLABS_API_KEY;
+        if (!apiKey) {
+          throw new Error('ELEVENLABS_API_KEY is not configured in environment variables');
+        }
+        
+        // Map language to language code
+        const languageCodeMap: Record<string, string> = {
+          'english': 'en',
+          'japanese': 'ja',
+          'chinese': 'zh',
+          'german': 'de',
+          'hindi': 'hi',
+          'french': 'fr',
+          'korean': 'ko',
+          'portuguese': 'pt',
+          'italian': 'it',
+          'spanish': 'es',
+          'russian': 'ru',
+          'indonesian': 'id',
+          'dutch': 'nl',
+          'turkish': 'tr',
+          'filipino': 'fil',
+          'polish': 'pl',
+          'swedish': 'sv',
+          'bulgarian': 'bg',
+          'romanian': 'ro',
+          'arabic': 'ar',
+          'czech': 'cs',
+          'greek': 'el',
+          'finnish': 'fi',
+          'croatian': 'hr',
+          'malay': 'ms',
+          'slovak': 'sk',
+          'danish': 'da',
+          'tamil': 'ta',
+          'ukrainian': 'uk',
+          'vietnamese': 'vi',
+          'norwegian': 'no',
+          'hungarian': 'hu'
+        };
+        
+        console.log(`[API] Generating audio for story "${story.title}" with voice ${story.voice}`);
+        
+        const languageCode = languageCodeMap[story.language?.toLowerCase()] || 'en';
+        console.log(`[API] Using language code: ${languageCode} for language: ${story.language}`);
+        
+        // Call ElevenLabs API
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${story.voice}?output_format=mp3_44100_128`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': apiKey
+          },
+          body: JSON.stringify({
+            text: story.text_content,
+            model_id: 'eleven_turbo_v2_5',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+            },
+            language_code: languageCode
+          })
+        });
+        
+        if (!response.ok) {
+          let errorMessage = `ElevenLabs API error: ${response.status}`;
+          try {
+            const errorJson = await response.json();
+            errorMessage = `ElevenLabs API error: ${JSON.stringify(errorJson)}`;
+          } catch {}
+          
+          console.error(errorMessage);
+          throw new Error(errorMessage);
+        }
+        
+        // Upload audio to Cloudinary
+        const audioBuffer = await response.arrayBuffer();
+        console.log(`[API] Successfully received audio (${audioBuffer.byteLength} bytes)`);
+        
+        const audioBase64 = `data:audio/mpeg;base64,${Buffer.from(audioBuffer).toString('base64')}`;
+        
+        const uploadResult = await cloudinary.uploader.upload(audioBase64, {
+          resource_type: 'auto',
+          folder: 'story-app-audio',
+          public_id: `${body.storyId}-audio`,
+          overwrite: true
+        });
+        
+        const audioUrl = uploadResult.secure_url;
+        console.log(`[API] Audio uploaded to Cloudinary: ${audioUrl}`);
+        
+        // Update the story in the database
+        const { error: updateError } = await adminClient
+          .from('stories')
+          .update({
+            audio_url: audioUrl,
+            mixed_audio_url: audioUrl,
+            status: 'completed'
+          })
+          .eq('id', body.storyId);
+        
+        if (updateError) {
+          console.error('[API] Error updating story with audio URL:', updateError);
+        }
+        
+        return new NextResponse(
+          JSON.stringify({ 
+            success: true, 
+            storyId: body.storyId,
+            audioUrl: audioUrl
+          }), 
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      } catch (audioError) {
+        console.error('[API] Error generating or uploading audio:', audioError);
+        return new NextResponse(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Failed to generate audio', 
+            details: audioError instanceof Error ? audioError.message : 'Unknown error'
+          }), 
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    
+    // Normal story generation flow
     const { 
       images, 
       characters, 

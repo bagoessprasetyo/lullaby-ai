@@ -135,18 +135,21 @@ async function triggerAudioGeneration(storyId: string): Promise<void> {
   try {
     console.log(`Triggering audio generation for story ${storyId}...`);
     
-    // Call the webhook API to generate audio asynchronously
-    const response = await fetch(`/api/stories/generate/webhook`, {
+    // Call the main API route with the flag to generate audio only
+    const response = await fetch(`/api/stories/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ storyId }),
+      body: JSON.stringify({ 
+        storyId, 
+        audioOnly: true 
+      }),
       // Add a longer timeout as audio generation can take time
-      signal: AbortSignal.timeout(10000), // 10 seconds just for the trigger call
+      signal: AbortSignal.timeout(30000), // 30 seconds just for the trigger call
     });
 
-    console.log(`Audio webhook response status: ${response.status}`);
+    console.log(`Audio generation response status: ${response.status}`);
     
     if (!response.ok) {
       let errorMessage = "Failed to trigger audio generation";
@@ -334,19 +337,30 @@ export function pollStoryStatus(
  */
 export async function getStoryStatus(storyId: string): Promise<GenerateStoryResponse> {
   try {
+    console.log(`[API] Getting status for story ${storyId}`);
     const response = await fetch(`/api/stories/${storyId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
+      // Add a timeout to prevent hanging requests
+      signal: AbortSignal.timeout(10000), // 10 second timeout
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to get story status");
+      let errorMessage = `Failed to get story status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        // If JSON parsing fails, use the status code
+      }
+      throw new Error(errorMessage);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log(`[API] Story status retrieved: ${data.status || 'unknown'}`);
+    return data;
   } catch (error) {
     console.error("Error getting story status:", error);
     return {

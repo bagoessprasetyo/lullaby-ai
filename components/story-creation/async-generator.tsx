@@ -75,40 +75,193 @@ export function EnhancedStoryGenerator({
   };
 
   // Function to generate the story with our enhanced process - exported so it can be called manually
+  // const generateStory = async () => {
+  //   console.log('[Story Generator] Starting enhanced story generation process');
+  //   try {
+  //     // Initial state setup
+  //     setStatus("analyzing");
+  //     setProgress(10);
+  //     setError(null);
+  //     setErrorDetails(null);
+
+  //     // Set correct status for uploading images
+  //     setStatus("analyzing");
+  //     console.log('[Story Generator] Preparing to upload images to Cloudinary');
+      
+  //     // Convert images to base64 for API upload
+  //     console.log(`[Story Generator] Converting ${formData.images.length} images to base64`);
+  //     const imagePromises = formData.images.map(file => fileToBase64(file));
+  //     const images = await Promise.all(imagePromises);
+
+  //     setProgress(25);
+  //     console.log('[Story Generator] Images converted successfully, ready for upload');
+      
+  //     // Image upload will happen in the API call
+
+  //     // Prepare request payload
+  //     const payload = {
+  //       images,
+  //       characters: formData.characters,
+  //       theme: formData.theme,
+  //       duration: formData.duration,
+  //       language: formData.language,
+  //       backgroundMusic: formData.backgroundMusic,
+  //       voice: formData.voice,
+  //     };
+
+  //     console.log('[Story Generator] Payload prepared:', {
+  //       theme: payload.theme,
+  //       language: payload.language,
+  //       voice: payload.voice,
+  //       imageCount: images.length,
+  //       characterCount: payload.characters.length
+  //     });
+
+  //     // Start story generation
+  //     setStatus("generating");
+  //     setProgress(40);
+
+  //     // Send API request to generate story
+  //     console.log('[Story Generator] Sending request to enhanced story generation API');
+  //     console.time('story-generation');
+      
+  //     const response = await fetch('/api/stories/generate', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify(payload),
+  //     });
+      
+  //     console.timeEnd('story-generation');
+  //     console.log(`[Story Generator] API response status: ${response.status}`);
+
+  //     // Handle errors in API response
+  //     if (!response.ok) {
+  //       let errorResponse;
+  //       try {
+  //         errorResponse = await response.json();
+  //         console.error('[Story Generator] API error response:', errorResponse);
+  //       } catch (parseError) {
+  //         console.error('[Story Generator] Failed to parse API error response:', parseError);
+  //         errorResponse = { error: `Error ${response.status}` };
+  //       }
+        
+  //       throw new Error(errorResponse.error || `Error: ${response.status}`);
+  //     }
+
+  //     // Process successful response
+  //     const data = await response.json();
+  //     console.log('[Story Generator] Story generation successful:', {
+  //       storyId: data.storyId,
+  //       title: data.title,
+  //       contentLength: data.textContent?.length,
+  //       hasAudio: !!data.audioUrl
+  //     });
+
+  //     if (!data.success) {
+  //       throw new Error(data.error || 'Story generation failed');
+  //     }
+
+  //     setProgress(80);
+
+  //     // Set the story data
+  //     setStory({
+  //       id: data.storyId,
+  //       title: data.title,
+  //       content: data.textContent,
+  //       audioUrl: data.audioUrl || null
+  //     });
+
+  //     // If we have audio, we're done
+  //     if (data.audioUrl) {
+  //       setStatus("completed");
+  //       setProgress(100);
+  //       console.log('[Story Generator] Story complete with audio');
+  //     } else {
+  //       // Otherwise wait for audio generation
+  //       setStatus("audio");
+  //       console.log('[Story Generator] Waiting for audio generation');
+        
+  //       // Poll for audio every 5 seconds for up to 2 minutes
+  //       let attempts = 0;
+  //       const maxAttempts = 24; // 2 minutes at 5 second intervals
+        
+  //       const checkAudio = async () => {
+  //         try {
+  //           const audioResponse = await fetch(`/api/stories/${data.storyId}`);
+  //           if (audioResponse.ok) {
+  //             const storyData = await audioResponse.json();
+              
+  //             if (storyData.audioUrl) {
+  //               // Audio is ready
+  //               setStory(prev => prev ? { ...prev, audioUrl: storyData.audioUrl } : null);
+  //               setStatus("completed");
+  //               setProgress(100);
+  //               console.log('[Story Generator] Audio generation completed');
+  //               return true;
+  //             }
+  //           }
+  //         } catch (e) {
+  //           console.error('[Story Generator] Error checking audio status:', e);
+  //         }
+          
+  //         attempts++;
+  //         if (attempts >= maxAttempts) {
+  //           console.log('[Story Generator] Audio generation timeout, marking as complete anyway');
+  //           setStatus("completed"); 
+  //           setProgress(100);
+  //           return true;
+  //         }
+          
+  //         // Calculate progress percentage (from 80% to 99%)
+  //         const audioProgress = 80 + Math.min(19, (attempts / maxAttempts) * 19);
+  //         setProgress(audioProgress);
+          
+  //         // Try again after delay
+  //         setTimeout(checkAudio, 5000);
+  //         return false;
+  //       };
+        
+  //       // Start polling
+  //       checkAudio();
+  //     }
+  //   } catch (err) {
+  //     console.error('[Story Generator] Error in story generation process:', err);
+  //     setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+  //     setStatus("error");
+  //   }
+  // };
   const generateStory = async () => {
-    console.log('[Story Generator] Starting enhanced story generation process');
+    console.log('[Story Generator] Starting story generation process');
     try {
       // Initial state setup
       setStatus("analyzing");
       setProgress(10);
       setError(null);
       setErrorDetails(null);
-
-      // Set correct status for uploading images
-      setStatus("analyzing");
-      console.log('[Story Generator] Preparing to upload images to Cloudinary');
+      
+      console.log('[Story Generator] Preparing to upload images');
       
       // Convert images to base64 for API upload
       console.log(`[Story Generator] Converting ${formData.images.length} images to base64`);
       const imagePromises = formData.images.map(file => fileToBase64(file));
       const images = await Promise.all(imagePromises);
-
+      
       setProgress(25);
       console.log('[Story Generator] Images converted successfully, ready for upload');
       
-      // Image upload will happen in the API call
-
       // Prepare request payload
       const payload = {
         images,
         characters: formData.characters,
         theme: formData.theme,
-        duration: formData.duration,
+        duration: formData.duration, // Keep original string format
         language: formData.language,
         backgroundMusic: formData.backgroundMusic,
         voice: formData.voice,
       };
-
+      
       console.log('[Story Generator] Payload prepared:', {
         theme: payload.theme,
         language: payload.language,
@@ -116,115 +269,129 @@ export function EnhancedStoryGenerator({
         imageCount: images.length,
         characterCount: payload.characters.length
       });
-
+      
       // Start story generation
       setStatus("generating");
       setProgress(40);
-
-      // Send API request to generate story
-      console.log('[Story Generator] Sending request to enhanced story generation API');
+      
+      // Send API request to generate story directly
+      console.log('[Story Generator] Sending request to story generation API');
       console.time('story-generation');
       
-      const response = await fetch('/api/stories/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      // Use a timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
       
-      console.timeEnd('story-generation');
-      console.log(`[Story Generator] API response status: ${response.status}`);
-
-      // Handle errors in API response
-      if (!response.ok) {
-        let errorResponse;
-        try {
-          errorResponse = await response.json();
-          console.error('[Story Generator] API error response:', errorResponse);
-        } catch (parseError) {
-          console.error('[Story Generator] Failed to parse API error response:', parseError);
-          errorResponse = { error: `Error ${response.status}` };
+      try {
+        const response = await fetch('/api/stories/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        console.timeEnd('story-generation');
+        console.log(`[Story Generator] API response status: ${response.status}`);
+        
+        // Handle errors in API response
+        if (!response.ok) {
+          let errorResponse;
+          try {
+            errorResponse = await response.json();
+            console.error('[Story Generator] API error response:', errorResponse);
+          } catch (parseError) {
+            console.error('[Story Generator] Failed to parse API error response:', parseError);
+            errorResponse = { error: `Error ${response.status}` };
+          }
+          
+          throw new Error(errorResponse.error || `Error: ${response.status}`);
         }
         
-        throw new Error(errorResponse.error || `Error: ${response.status}`);
-      }
-
-      // Process successful response
-      const data = await response.json();
-      console.log('[Story Generator] Story generation successful:', {
-        storyId: data.storyId,
-        title: data.title,
-        contentLength: data.textContent?.length,
-        hasAudio: !!data.audioUrl
-      });
-
-      if (!data.success) {
-        throw new Error(data.error || 'Story generation failed');
-      }
-
-      setProgress(80);
-
-      // Set the story data
-      setStory({
-        id: data.storyId,
-        title: data.title,
-        content: data.textContent,
-        audioUrl: data.audioUrl || null
-      });
-
-      // If we have audio, we're done
-      if (data.audioUrl) {
-        setStatus("completed");
-        setProgress(100);
-        console.log('[Story Generator] Story complete with audio');
-      } else {
-        // Otherwise wait for audio generation
-        setStatus("audio");
-        console.log('[Story Generator] Waiting for audio generation');
+        // Process successful response
+        const data = await response.json();
+        console.log('[Story Generator] Story generation successful:', {
+          storyId: data.storyId,
+          title: data.title,
+          contentLength: data.textContent?.length,
+          hasAudio: !!data.audioUrl
+        });
         
-        // Poll for audio every 5 seconds for up to 2 minutes
-        let attempts = 0;
-        const maxAttempts = 24; // 2 minutes at 5 second intervals
+        if (!data.success) {
+          throw new Error(data.error || 'Story generation failed');
+        }
         
-        const checkAudio = async () => {
-          try {
-            const audioResponse = await fetch(`/api/stories/${data.storyId}`);
-            if (audioResponse.ok) {
-              const storyData = await audioResponse.json();
-              
-              if (storyData.audioUrl) {
-                // Audio is ready
-                setStory(prev => prev ? { ...prev, audioUrl: storyData.audioUrl } : null);
-                setStatus("completed");
-                setProgress(100);
-                console.log('[Story Generator] Audio generation completed');
-                return true;
+        setProgress(80);
+        
+        // Set the story data
+        setStory({
+          id: data.storyId,
+          title: data.title || 'Your Story',
+          content: data.textContent,
+          audioUrl: data.audioUrl || null
+        });
+        
+        // If we have audio, we're done
+        if (data.audioUrl) {
+          console.log('[Story Generator] Story complete with audio');
+          setStatus("completed");
+          setProgress(100);
+        } else {
+          // Otherwise wait for audio generation
+          setStatus("audio");
+          console.log('[Story Generator] Waiting for audio generation');
+          
+          // Poll for audio every 5 seconds
+          let attempts = 0;
+          const maxAttempts = 24; // 2 minutes at 5 second intervals
+          
+          const checkAudio = async () => {
+            try {
+              const audioResponse = await fetch(`/api/stories/${data.storyId}`);
+              if (audioResponse.ok) {
+                const storyData = await audioResponse.json();
+                
+                if (storyData.audioUrl) {
+                  // Audio is ready
+                  setStory(prev => prev ? { ...prev, audioUrl: storyData.audioUrl } : null);
+                  setStatus("completed");
+                  setProgress(100);
+                  console.log('[Story Generator] Audio generation completed');
+                  return true;
+                }
               }
+            } catch (e) {
+              console.error('[Story Generator] Error checking audio status:', e);
             }
-          } catch (e) {
-            console.error('[Story Generator] Error checking audio status:', e);
-          }
+            
+            attempts++;
+            if (attempts >= maxAttempts) {
+              console.log('[Story Generator] Audio generation timeout, marking as complete anyway');
+              setStatus("completed"); 
+              setProgress(100);
+              return true;
+            }
+            
+            // Calculate progress percentage (from 80% to 99%)
+            const audioProgress = 80 + Math.min(19, (attempts / maxAttempts) * 19);
+            setProgress(audioProgress);
+            
+            // Try again after delay
+            setTimeout(checkAudio, 5000);
+            return false;
+          };
           
-          attempts++;
-          if (attempts >= maxAttempts) {
-            console.log('[Story Generator] Audio generation timeout, marking as complete anyway');
-            setStatus("completed"); 
-            setProgress(100);
-            return true;
-          }
-          
-          // Calculate progress percentage (from 80% to 99%)
-          const audioProgress = 80 + Math.min(19, (attempts / maxAttempts) * 19);
-          setProgress(audioProgress);
-          
-          // Try again after delay
-          setTimeout(checkAudio, 5000);
-          return false;
-        };
-        
-        // Start polling
-        checkAudio();
+          // Start polling
+          checkAudio();
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Request timed out. Please try again.');
+        }
+        throw fetchError;
       }
     } catch (err) {
       console.error('[Story Generator] Error in story generation process:', err);
