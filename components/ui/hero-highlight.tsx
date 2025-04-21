@@ -68,9 +68,9 @@ export const HeroHighlight = ({
         </Announcement>
         {children}
         <AudioPlayer
-            src="/story.wav"
+            src="https://res.cloudinary.com/dcx38wpwa/video/upload/v1742185189/story-app-audio/60bd34fb-e13d-4c24-bd3e-1f5a13454c4d-audio.mp3"
             cover="https://images.unsplash.com/photo-1685320087274-31388d5d1f55?q=80&w=2942&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-            title="The Sleepy Bear's Adventure - Daddy's Bedtime Tale"
+            title="Joko and the Soothing Rain - Daddy's Bedtime Tale"
         />
         </div>
     </div>
